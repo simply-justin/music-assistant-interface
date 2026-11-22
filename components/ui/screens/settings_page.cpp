@@ -106,7 +106,7 @@ private:
         lv_obj_t* r = kit::row(col, 8);
         lv_obj_set_width(r, lv_pct(100));
         lv_obj_set_style_pad_all(r, 4, 0);
-        lv_obj_set_style_radius(r, 16, 0);
+        lv_obj_set_style_radius(r, theme::kRadiusControl, 0);
         lv_obj_set_style_bg_color(r, theme::elevated(), 0);
         lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
         kit::icon_button(r, icon::minus, [minutes, set] { set((minutes + 24 * 60 - 15) % (24 * 60)); });
@@ -132,7 +132,7 @@ private:
         lv_obj_t* seg = kit::row(day, 8);
         for (int s : {30, 120, 300, 0}) {
             std::string label = s == 0 ? std::string(tr(i18n::Str::dim_never)) : s < 60 ? std::to_string(s) + " s" : std::to_string(s / 60) + " min";
-            kit::chip(seg, nullptr, label, d.dim_after_s == s, [d, s, set] { auto x = d; x.dim_after_s = s; set(x); });
+            kit::tab(seg, label, d.dim_after_s == s, [d, s, set] { auto x = d; x.dim_after_s = s; set(x); });
         }
         toggle_row(day, tr(i18n::Str::display_clock), tr(i18n::Str::display_clock_sub), d.clock_when_dimmed,
                    [d, set](bool on) { auto x = d; x.clock_when_dimmed = on; set(x); });

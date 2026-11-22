@@ -16,11 +16,13 @@ public:
 
         lv_obj_t* field = kit::row(root, 16);
         lv_obj_set_size(field, lv_pct(100), 64);
-        lv_obj_set_style_radius(field, 32, 0);
-        lv_obj_set_style_pad_left(field, 24, 0);
+        lv_obj_set_style_radius(field, theme::kRadiusControl, 0);
+        lv_obj_set_style_pad_left(field, 20, 0);
         lv_obj_set_style_pad_right(field, 8, 0);
         lv_obj_set_style_bg_color(field, theme::surface(), 0);
         lv_obj_set_style_bg_opa(field, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(field, 1, 0);
+        lv_obj_set_style_border_color(field, theme::border(), 0);
         kit::icon(field, icon::search, 28, theme::text2());
         input_ = lv_textarea_create(field);
         lv_obj_remove_style_all(input_);
@@ -94,7 +96,7 @@ private:
                     C{Filter::Artists, i18n::Str::filter_artists}, C{Filter::Albums, i18n::Str::filter_albums},
                     C{Filter::Playlists, i18n::Str::filter_playlists}, C{Filter::Radio, i18n::Str::filter_radio}}) {
             Filter f = c.f;
-            kit::chip(chips_, nullptr, tr(c.s), filter_ == f, [this, f] {
+            kit::tab(chips_, tr(c.s), filter_ == f, [this, f] {
                 filter_ = f;
                 kit::later([this] { refresh(Topic::Search); });
             });
@@ -182,7 +184,7 @@ private:
             lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
             lv_obj_set_style_bg_color(card, theme::surface(), 0);
             lv_obj_set_style_bg_color(card, theme::elevated(), LV_STATE_PRESSED);
-            kit::art(card, *r.top, 132, 12);
+            kit::art(card, *r.top, 132, theme::kRadiusArt, theme::surface());
             lv_obj_t* name = kit::text(card, r.top->name, theme::h1(), theme::text());
             lv_obj_set_width(name, lv_pct(100));
             kit::text(card, kit::subtitle(*r.top), theme::body(), theme::text2());

@@ -83,7 +83,7 @@ private:
         lv_textarea_set_password_mode(input_, password);
         lv_textarea_set_placeholder_text(input_, placeholder.c_str());
         lv_obj_set_size(input_, lv_pct(100), 64);
-        lv_obj_set_style_radius(input_, 16, 0);
+        lv_obj_set_style_radius(input_, theme::kRadiusControl, 0);
         lv_obj_set_style_bg_color(input_, theme::surface(), 0);
         lv_obj_set_style_border_width(input_, 2, 0);
         lv_obj_set_style_border_color(input_, theme::border(), 0);
@@ -188,7 +188,7 @@ private:
         if (!v.pairing_url.empty() && !typing_) {
             lv_obj_t* qr_box = kit::column(body);
             lv_obj_set_style_pad_all(qr_box, 16, 0);
-            lv_obj_set_style_radius(qr_box, 16, 0);
+            lv_obj_set_style_radius(qr_box, theme::kRadiusCard, 0);
             lv_obj_set_style_bg_color(qr_box, lv_color_white(), 0);
             lv_obj_set_style_bg_opa(qr_box, LV_OPA_COVER, 0);
 #if LV_USE_QRCODE
@@ -238,11 +238,7 @@ private:
             std::string sub = !p.available ? tr(i18n::Str::setup_offline)
                             : p.group_members.empty() ? tr(i18n::Str::setup_available) : tr(i18n::Str::setup_group);
             lv_obj_t* r = nav_row(c, icon::speaker, p.name, sub, [id] { send(app::cmd::SelectPlayer{id}); }, false);
-            if (id == pv->selected_id) {
-                lv_obj_set_style_border_width(r, 2, 0);
-                lv_obj_set_style_border_color(r, theme::accent(), 0);
-                kit::icon(r, icon::check, 28, theme::accent());
-            }
+            if (id == pv->selected_id) kit::icon(r, icon::check, 28, theme::accent());
         }
         footer(SetupStep::SignIn, [] { go(SetupStep::Done); }, any);
     }

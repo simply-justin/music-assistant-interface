@@ -55,7 +55,7 @@ private:
                     T{Tab::Albums, i18n::Str::filter_albums}, T{Tab::Artists, i18n::Str::filter_artists},
                     T{Tab::Tracks, i18n::Str::filter_tracks}, T{Tab::Radio, i18n::Str::filter_radio}}) {
             Tab t = x.t;
-            kit::chip(tabs_, nullptr, tr(x.s), tab_ == t, [this, t] {
+            kit::tab(tabs_, tr(x.s), tab_ == t, [this, t] {
                 tab_ = t;
                 kit::later([this] {
                     load();

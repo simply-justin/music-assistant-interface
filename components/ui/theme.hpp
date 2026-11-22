@@ -10,6 +10,7 @@ inline lv_color_t bg() { return lv_color_hex(0x0B0F14); }
 inline lv_color_t surface() { return lv_color_hex(0x151B23); }
 inline lv_color_t elevated() { return lv_color_hex(0x202834); }
 inline lv_color_t border() { return lv_color_hex(0x2A3442); }
+inline lv_color_t hairline() { return lv_color_hex(0x1A212B); }  // row separators
 inline lv_color_t text() { return lv_color_hex(0xF5F7FA); }
 inline lv_color_t text2() { return lv_color_hex(0xA0AAB8); }
 inline lv_color_t text3() { return lv_color_hex(0x8B95A4); }
@@ -40,7 +41,10 @@ inline const lv_font_t* icons(int size) {
 constexpr int32_t kScreenW = 1280, kScreenH = 800;
 constexpr int32_t kRailW = 96, kMiniH = 96, kPad = 40;
 constexpr int32_t kPrimary = 64, kSecondary = 56, kChipH = 56, kGap = 8;
-constexpr int32_t kRadiusRow = 14, kRadiusTile = 12, kRadiusCard = 20, kRadiusSheet = 24;
+// Clean look (2026-11-22 revision): small radii, no pills. Only the play button and artist
+// photos are round.
+constexpr int32_t kRadiusArt = 4, kRadiusControl = 6, kRadiusCard = 8, kRadiusSheet = 12;
+constexpr int32_t kRadiusRow = 0, kRadiusTile = kRadiusArt;
 
 // Placeholder artwork colour for an item (until the artwork pipeline lands): muted, stable per uri.
 lv_color_t art_colour(const char* key);

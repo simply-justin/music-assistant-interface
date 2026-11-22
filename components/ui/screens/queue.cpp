@@ -40,7 +40,7 @@ private:
         if (!item) return;
         kit::overline(left_, tr(i18n::Str::home_now_playing));
         lv_obj_t* np = kit::column(left_, 16);
-        kit::art(np, *item, 340, 16);
+        kit::art(np, *item, 340, theme::kRadiusArt);
         kit::text(np, item->name, theme::h2(), theme::text());
         lv_obj_t* sub = kit::row(np, 8);
         kit::text(sub, kit::subtitle(*item), theme::body(), theme::text2());

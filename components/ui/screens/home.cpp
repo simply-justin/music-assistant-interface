@@ -74,8 +74,8 @@ private:
         lv_obj_set_style_pad_all(card, 24, 0);
         lv_obj_set_style_radius(card, theme::kRadiusCard, 0);
         lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(card, lv_color_hex(0x1B2A2E), 0);
-        lv_obj_set_style_bg_color(card, lv_color_hex(0x243A40), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(card, theme::surface(), 0);
+        lv_obj_set_style_bg_color(card, theme::elevated(), LV_STATE_PRESSED);
         auto item = state().now_playing();
         if (!item) {
             lv_obj_t* col = kit::column(card, 10);
@@ -83,7 +83,7 @@ private:
             kit::overline(col, tr(i18n::Str::home_nothing_playing), theme::text2());
             kit::text(col, tr(i18n::Str::home_pick_favourite), theme::lead(), theme::text(), true);
         } else {
-            kit::art(card, *item, 224, 14, lv_color_hex(0x1B2A2E));
+            kit::art(card, *item, 224, theme::kRadiusArt, theme::surface());
             lv_obj_t* col = kit::column(card, 0);
             lv_obj_set_flex_grow(col, 1);
             lv_obj_set_size(col, 1, lv_pct(100));
@@ -142,10 +142,10 @@ private:
         }
         lv_obj_t* head = kit::row(shelf_, 12);
         lv_obj_set_width(head, lv_pct(100));
-        kit::chip(head, nullptr, tr(i18n::Str::home_recently_played), !show_playlists_, [this] { show_playlists_ = false; kit::later([this] { build_shelf(); }); });
-        kit::chip(head, nullptr, tr(i18n::Str::home_your_playlists), show_playlists_, [this] { show_playlists_ = true; kit::later([this] { build_shelf(); }); });
+        kit::tab(head, tr(i18n::Str::home_recently_played), !show_playlists_, [this] { show_playlists_ = false; kit::later([this] { build_shelf(); }); });
+        kit::tab(head, tr(i18n::Str::home_your_playlists), show_playlists_, [this] { show_playlists_ = true; kit::later([this] { build_shelf(); }); });
         kit::spacer(head);
-        kit::chip(head, nullptr, tr(i18n::Str::home_see_all), false, [] { open(ScreenId::Library); });
+        kit::tab(head, tr(i18n::Str::home_see_all), false, [] { open(ScreenId::Library); });
 
         lv_obj_t* cards = kit::row(shelf_, 24);
         lv_obj_set_flex_align(cards, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);

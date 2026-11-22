@@ -35,7 +35,10 @@ lv_obj_t* icon_button(lv_obj_t* parent, const char* glyph, Action action, int32_
                       bool filled = false, lv_color_t colour = theme::text());
 // Big round play/pause (accent).
 lv_obj_t* play_button(lv_obj_t* parent, bool playing, Action action, int32_t size);
+// Action chip: rectangular, 1 px border; `selected` = a toggle that is on (accent).
 lv_obj_t* chip(lv_obj_t* parent, const char* glyph, const std::string& label, bool selected, Action action);
+// Tab / filter: plain text, the selected one white with an accent underline.
+lv_obj_t* tab(lv_obj_t* parent, const std::string& label, bool selected, Action action);
 lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action);
 
 // Artwork box: placeholder colour (+ type icon for radio) until the real image arrives.

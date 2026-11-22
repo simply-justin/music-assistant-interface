@@ -57,7 +57,7 @@ private:
 
         lv_obj_t* left = kit::column(body, 20);
         lv_obj_set_width(left, 300);
-        kit::art(left, item, 300, 16);
+        kit::art(left, item, 300, theme::kRadiusArt);
         lv_obj_t* info = kit::column(left, 8);
         lv_obj_set_width(info, 300);
         i18n::Str type = item.type == core::MediaType::Album ? i18n::Str::type_album

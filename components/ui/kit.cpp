@@ -189,8 +189,8 @@ lv_obj_t* icon(lv_obj_t* parent, const char* glyph, int size, lv_color_t colour)
 lv_obj_t* button(lv_obj_t* parent, Button kind, const char* glyph, const std::string& label, Action action) {
     lv_obj_t* b = row(parent, 10);
     lv_obj_set_height(b, kind == Button::Secondary ? theme::kSecondary : theme::kPrimary);
-    lv_obj_set_style_pad_hor(b, 28, 0);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_pad_hor(b, 24, 0);
+    lv_obj_set_style_radius(b, theme::kRadiusControl, 0);
     lv_obj_set_style_bg_opa(b, kind == Button::Ghost ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_color_t fg = theme::text();
@@ -216,9 +216,13 @@ lv_obj_t* icon_button(lv_obj_t* parent, const char* glyph, Action action, int32_
     lv_obj_t* b = lv_obj_create(parent);
     remove_style(b);
     lv_obj_set_size(b, size, size);
-    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-    pressable(b, filled ? theme::elevated() : theme::surface());
-    lv_obj_set_style_bg_opa(b, filled ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_radius(b, theme::kRadiusControl, 0);
+    pressable(b, theme::surface());
+    lv_obj_set_style_bg_opa(b, LV_OPA_TRANSP, 0);
+    if (filled) {
+        lv_obj_set_style_border_width(b, 1, 0);
+        lv_obj_set_style_border_color(b, theme::border(), 0);
+    }
     lv_obj_t* i = icon(b, glyph, icon_size, colour);
     lv_obj_center(i);
     on_click(b, std::move(action));
@@ -227,30 +231,49 @@ lv_obj_t* icon_button(lv_obj_t* parent, const char* glyph, Action action, int32_
 
 lv_obj_t* play_button(lv_obj_t* parent, bool playing, Action action, int32_t size) {
     lv_obj_t* b = icon_button(parent, playing ? icon::pause : icon::play, std::move(action), size, size >= 96 ? 48 : 32,
-                              true, theme::on_accent());
+                              false, theme::on_accent());
+    lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);  // the one round control
     pressable(b, theme::accent(), true);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     return b;
 }
 
 lv_obj_t* chip(lv_obj_t* parent, const char* glyph, const std::string& label, bool selected, Action action) {
     lv_obj_t* c = row(parent, 8);
     lv_obj_set_height(c, theme::kChipH);
-    lv_obj_set_style_pad_hor(c, 22, 0);
-    lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-    pressable(c, selected ? theme::text() : theme::surface(), selected);
-    lv_color_t fg = selected ? theme::bg() : theme::text();
+    lv_obj_set_style_pad_hor(c, 18, 0);
+    lv_obj_set_style_radius(c, theme::kRadiusControl, 0);
+    pressable(c, theme::bg());
+    lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(c, 1, 0);
+    lv_obj_set_style_border_color(c, selected ? theme::accent() : theme::border(), 0);
+    lv_color_t fg = selected ? theme::accent() : theme::text();
     if (glyph) icon(c, glyph, 22, selected ? fg : theme::text2());
     text(c, label, theme::body(), fg);
     on_click(c, std::move(action));
     return c;
 }
 
+lv_obj_t* tab(lv_obj_t* parent, const std::string& label, bool selected, Action action) {
+    lv_obj_t* t = row(parent);
+    lv_obj_set_height(t, theme::kChipH);
+    lv_obj_set_style_pad_hor(t, 4, 0);
+    lv_obj_set_style_margin_right(t, 20, 0);
+    lv_obj_set_style_border_side(t, LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_width(t, selected ? 2 : 0, 0);
+    lv_obj_set_style_border_color(t, theme::accent(), 0);
+    lv_obj_set_style_bg_color(t, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(t, LV_OPA_COVER, LV_STATE_PRESSED);
+    text(t, label, theme::body(), selected ? theme::text() : theme::text2());
+    on_click(t, std::move(action));
+    return t;
+}
+
 lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action) {
     lv_obj_t* c = row(parent, 4);
     lv_obj_set_height(c, theme::kChipH);
     lv_obj_set_style_pad_right(c, 18, 0);
-    lv_obj_set_style_radius(c, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_radius(c, theme::kRadiusControl, 0);
     pressable(c, theme::bg());
     lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
     icon(c, icon::chevron_left, 28, theme::text2());
@@ -277,7 +300,7 @@ lv_obj_t* badge(lv_obj_t* parent, const std::string& provider) {
     lv_obj_t* b = lv_obj_create(parent);
     remove_style(b);
     lv_obj_set_size(b, 20, 20);
-    lv_obj_set_style_radius(b, 5, 0);
+    lv_obj_set_style_radius(b, 3, 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(b, theme::elevated(), 0);
     char s[2] = {provider_letter(provider), 0};
@@ -288,9 +311,9 @@ lv_obj_t* badge(lv_obj_t* parent, const std::string& provider) {
 
 lv_obj_t* tag(lv_obj_t* parent, const std::string& s, lv_color_t colour) {
     lv_obj_t* t = row(parent);
-    lv_obj_set_height(t, 32);
-    lv_obj_set_style_pad_hor(t, 12, 0);
-    lv_obj_set_style_radius(t, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_height(t, 28);
+    lv_obj_set_style_pad_hor(t, 8, 0);
+    lv_obj_set_style_radius(t, 4, 0);
     lv_obj_set_style_border_width(t, 1, 0);
     lv_obj_set_style_border_color(t, theme::border(), 0);
     text(t, s, theme::label(), colour);
@@ -326,11 +349,14 @@ std::string provider_name(const std::string& domain) {
 lv_obj_t* media_row(lv_obj_t* parent, const core::MediaItem& item, const RowOptions& opt) {
     lv_obj_t* r = row(parent, 16);
     lv_obj_set_size(r, lv_pct(100), opt.height);
-    lv_obj_set_style_pad_hor(r, 12, 0);
-    lv_obj_set_style_radius(r, theme::kRadiusRow, 0);
-    pressable(r, opt.playing ? theme::surface() : theme::bg());
-    lv_obj_set_style_bg_opa(r, opt.playing ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-    art(r, item, opt.height - 20, 8, opt.playing ? theme::surface() : theme::bg());
+    lv_obj_set_style_pad_hor(r, 8, 0);
+    lv_obj_set_style_radius(r, 0, 0);
+    pressable(r, theme::bg());
+    lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_side(r, LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_width(r, 1, 0);
+    lv_obj_set_style_border_color(r, theme::hairline(), 0);
+    art(r, item, opt.height - 24, theme::kRadiusArt, theme::bg());
     lv_obj_t* col = column(r, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);  // let flex-grow decide; enables "…" clipping
@@ -348,7 +374,7 @@ lv_obj_t* media_row(lv_obj_t* parent, const core::MediaItem& item, const RowOpti
         lv_obj_set_style_text_align(d, LV_TEXT_ALIGN_RIGHT, 0);
     }
     if (opt.on_more) icon_button(r, icon::more, opt.on_more, 56, 28, false, theme::text2());
-    if (opt.on_remove) icon_button(r, icon::close, opt.on_remove, 56, 22, true, theme::text2());
+    if (opt.on_remove) icon_button(r, icon::close, opt.on_remove, 56, 22, false, theme::text2());
     on_click(r, opt.on_tap);
     return r;
 }
@@ -373,8 +399,8 @@ lv_obj_t* media_card(lv_obj_t* parent, const core::MediaItem& item, const std::s
 lv_obj_t* favourite_tile(lv_obj_t* parent, const core::MediaItem& item, Action on_tap, Action long_press) {
     lv_obj_t* t = row(parent, 16);
     lv_obj_set_height(t, 80);
-    lv_obj_set_style_radius(t, theme::kRadiusTile, 0);
-    lv_obj_set_style_clip_corner(t, true, 0);
+    lv_obj_set_style_radius(t, theme::kRadiusArt, 0);
+    lv_obj_set_style_clip_corner(t, true, 0);  // 4 px on an 80 px tile: cheap
     lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
     pressable(t, theme::surface());
     lv_obj_set_style_pad_right(t, 16, 0);
@@ -495,7 +521,7 @@ lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& del, co
     lv_obj_set_style_bg_color(kb, lv_color_mix(lv_color_white(), theme::elevated(), 31), LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_text_color(kb, theme::text(), LV_PART_ITEMS);
     lv_obj_set_style_text_font(kb, theme::body(), LV_PART_ITEMS);
-    lv_obj_set_style_radius(kb, 12, LV_PART_ITEMS);
+    lv_obj_set_style_radius(kb, theme::kRadiusControl, LV_PART_ITEMS);
     lv_obj_set_style_border_width(kb, 0, LV_PART_ITEMS);
     lv_obj_set_style_shadow_width(kb, 0, LV_PART_ITEMS);
     lv_obj_add_event_cb(kb, [](lv_event_t* e) {
@@ -569,11 +595,12 @@ void toast(const std::string& message, const std::string& action_label, Action a
     lv_obj_add_event_cb(t, [](lv_event_t*) { current = nullptr; }, LV_EVENT_DELETE, nullptr);
     lv_obj_set_height(t, 72);
     lv_obj_set_style_pad_hor(t, 28, 0);
-    lv_obj_set_style_radius(t, 36, 0);
+    lv_obj_set_style_radius(t, theme::kRadiusCard, 0);
     lv_obj_set_style_bg_color(t, theme::elevated(), 0);
     lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(t, 1, 0);
-    lv_obj_set_style_border_color(t, theme::border(), 0);
+    lv_obj_set_style_border_side(t, LV_BORDER_SIDE_LEFT, 0);
+    lv_obj_set_style_border_width(t, 3, 0);
+    lv_obj_set_style_border_color(t, error ? theme::warning() : theme::accent(), 0);
     icon(t, error ? icon::warning : icon::check, 22, error ? theme::warning() : theme::accent());
     text(t, message, theme::body(), theme::text());
     if (!action_label.empty() && action) {

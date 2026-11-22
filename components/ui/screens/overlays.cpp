@@ -26,7 +26,7 @@ lv_obj_t* menu_row(lv_obj_t* parent, const char* glyph, const std::string& label
     lv_obj_t* r = kit::row(parent, 16);
     lv_obj_set_size(r, lv_pct(100), 64);
     lv_obj_set_style_pad_hor(r, 16, 0);
-    lv_obj_set_style_radius(r, 12, 0);
+    lv_obj_set_style_radius(r, theme::kRadiusControl, 0);
     lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
     lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
     kit::icon(r, glyph, 28, theme::text2());
@@ -167,7 +167,7 @@ void open_track_menu(const core::MediaItem& item) {
             lv_obj_t* r = kit::row(from, 14);
             lv_obj_set_size(r, lv_pct(100), 76);
             lv_obj_set_style_pad_hor(r, 16, 0);
-            lv_obj_set_style_radius(r, 14, 0);
+            lv_obj_set_style_radius(r, theme::kRadiusControl, 0);
             lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
             lv_obj_set_style_bg_color(r, &src == &sources[0] ? theme::elevated() : theme::surface(), 0);
             lv_obj_set_style_bg_color(r, lv_color_mix(lv_color_white(), theme::elevated(), 31), LV_STATE_PRESSED);
@@ -191,7 +191,7 @@ void open_favourite_preview(const core::MediaItem& item) {
     lv_obj_t* s = kit::sheet(760);
     lv_obj_t* head = kit::row(s, 24);
     lv_obj_set_width(head, lv_pct(100));
-    kit::art(head, item, 120, 14);
+    kit::art(head, item, 120, theme::kRadiusArt, theme::surface());
     lv_obj_t* col = kit::column(head, 6);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
@@ -259,7 +259,7 @@ void open_new_playlist(std::optional<core::MediaItem> first_item) {
     lv_obj_t* ta = lv_textarea_create(s);
     lv_textarea_set_one_line(ta, true);
     lv_obj_set_size(ta, lv_pct(100), 64);
-    lv_obj_set_style_radius(ta, 16, 0);
+    lv_obj_set_style_radius(ta, theme::kRadiusControl, 0);
     lv_obj_set_style_bg_color(ta, theme::elevated(), 0);
     lv_obj_set_style_border_color(ta, theme::accent(), 0);
     lv_obj_set_style_border_width(ta, 2, 0);
@@ -293,13 +293,7 @@ void confirm(const std::string& title, const std::string& body, const std::strin
     lv_obj_t* s = kit::sheet(600);
     lv_obj_set_flex_align(s, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(s, 40, 0);
-    lv_obj_t* ic = lv_obj_create(s);
-    lv_obj_remove_style_all(ic);
-    lv_obj_set_size(ic, 80, 80);
-    lv_obj_set_style_radius(ic, 40, 0);
-    lv_obj_set_style_bg_color(ic, theme::elevated(), 0);
-    lv_obj_set_style_bg_opa(ic, LV_OPA_COVER, 0);
-    lv_obj_center(kit::icon(ic, icon::trash, 32, theme::danger_text()));
+    kit::icon(s, icon::trash, 32, theme::danger_text());
     lv_obj_t* t = kit::text(s, title, theme::h1(), theme::text(), true);
     lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_t* b = kit::text(s, body, theme::lead(), theme::text2(), true);

@@ -53,7 +53,7 @@ void show(ScreenId id) {
     else lv_obj_remove_flag(s.rail, LV_OBJ_FLAG_HIDDEN);
     for (size_t i = 0; i < s.rail_items.size(); ++i) {
         bool on = static_cast<size_t>(scr.tab()) == i;
-        lv_obj_set_state(s.rail_items[i], LV_STATE_CHECKED, on);
+        lv_obj_set_style_border_width(s.rail_items[i], on ? 3 : 0, 0);
         // Children don't inherit the state: colour icon (child 0) and label (child 1) directly.
         lv_obj_set_style_text_color(lv_obj_get_child(s.rail_items[i], 0), on ? theme::accent() : theme::text2(), 0);
         lv_obj_set_style_text_color(lv_obj_get_child(s.rail_items[i], 1), on ? theme::text() : theme::text2(), 0);
@@ -91,7 +91,9 @@ void build_rail() {
     s.rail = kit::column(s.base, 8);
     lv_obj_set_size(s.rail, theme::kRailW, theme::kScreenH);
     lv_obj_set_style_pad_ver(s.rail, 24, 0);
-    lv_obj_set_style_pad_left(s.rail, 3, 0);
+    lv_obj_set_style_border_side(s.rail, LV_BORDER_SIDE_RIGHT, 0);
+    lv_obj_set_style_border_width(s.rail, 1, 0);
+    lv_obj_set_style_border_color(s.rail, theme::hairline(), 0);
     lv_obj_set_flex_align(s.rail, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     struct Item { ScreenId id; const char* glyph; i18n::Str label; };
     const Item items[] = {{ScreenId::Home, icon::home, i18n::Str::nav_home},
@@ -102,12 +104,12 @@ void build_rail() {
     for (const auto& it : items) {
         if (it.id == ScreenId::Settings) kit::spacer(s.rail);
         lv_obj_t* b = kit::column(s.rail, 4);
-        lv_obj_set_size(b, 90, 76);  // wide enough for "Instellingen" at 14 px
+        lv_obj_set_size(b, theme::kRailW, 76);  // wide enough for "Instellingen" at 14 px
         lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_radius(b, 16, 0);
-        lv_obj_set_style_bg_color(b, theme::surface(), LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_STATE_CHECKED);
-        lv_obj_set_style_bg_color(b, theme::elevated(), LV_STATE_PRESSED);
+        // Active item: a 3 px accent bar on the left (set in show()), no filled block.
+        lv_obj_set_style_border_side(b, LV_BORDER_SIDE_LEFT, 0);
+        lv_obj_set_style_border_color(b, theme::accent(), 0);
+        lv_obj_set_style_bg_color(b, theme::surface(), LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_STATE_PRESSED);
         kit::icon(b, it.glyph, 28, theme::text2());
         kit::text(b, tr(it.label), theme::label(), theme::text2());
@@ -155,7 +157,7 @@ void refresh_mini() {
 
     lv_obj_t* info = kit::row(s.mini, 16);
     lv_obj_set_width(info, 400);
-    kit::art(info, *item, 64, 10, theme::surface());
+    kit::art(info, *item, 64, theme::kRadiusArt, theme::surface());
     lv_obj_t* col = kit::column(info, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
@@ -324,23 +326,24 @@ std::string clock_text(int minutes) {
 lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
     lv_obj_t* c = kit::column(parent, 12);
     lv_obj_set_width(c, lv_pct(100));
-    lv_obj_set_style_pad_all(c, 28, 0);
+    lv_obj_set_style_pad_all(c, 24, 0);
     lv_obj_set_style_radius(c, theme::kRadiusCard, 0);
-    lv_obj_set_style_bg_color(c, theme::surface(), 0);
-    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-    if (!title.empty()) kit::text(c, title, theme::h2(), theme::text());
+    lv_obj_set_style_border_width(c, 1, 0);
+    lv_obj_set_style_border_color(c, theme::hairline(), 0);
+    if (!title.empty()) kit::overline(c, title);
     return c;
 }
 
 lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
                   bool chevron) {
     lv_obj_t* r = kit::row(parent, 16);
-    lv_obj_set_size(r, lv_pct(100), sub.empty() ? 64 : 80);
-    lv_obj_set_style_pad_hor(r, 16, 0);
-    lv_obj_set_style_radius(r, theme::kRadiusRow, 0);
-    lv_obj_set_style_bg_color(r, theme::elevated(), 0);
-    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(r, lv_color_mix(lv_color_white(), theme::elevated(), 31), LV_STATE_PRESSED);
+    lv_obj_set_size(r, lv_pct(100), sub.empty() ? 64 : 76);
+    lv_obj_set_style_pad_hor(r, 8, 0);
+    lv_obj_set_style_border_side(r, LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_width(r, 1, 0);
+    lv_obj_set_style_border_color(r, theme::hairline(), 0);
+    lv_obj_set_style_bg_color(r, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
     if (glyph) kit::icon(r, glyph, 28, theme::text2());
     lv_obj_t* col = kit::column(r, 4);
     lv_obj_set_flex_grow(col, 1);
@@ -356,7 +359,7 @@ lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& 
     lv_obj_t* b = kit::row(parent, 20);
     lv_obj_set_width(b, lv_pct(100));
     lv_obj_set_style_pad_all(b, 20, 0);
-    lv_obj_set_style_radius(b, 16, 0);
+    lv_obj_set_style_radius(b, theme::kRadiusCard, 0);
     lv_obj_set_style_bg_color(b, lv_color_hex(0x2A2416), 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(b, 1, 0);

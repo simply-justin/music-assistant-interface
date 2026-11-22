@@ -83,7 +83,7 @@ private:
         lv_obj_set_style_pad_bottom(body, 40, 0);
         // The art-derived background follows the real artwork once it's decoded.
         lv_obj_t* root = root_;
-        kit::art(body, *item, 520, 20, bg, [root](uint32_t avg) {
+        kit::art(body, *item, 520, theme::kRadiusCard, bg, [root](uint32_t avg) {
             lv_obj_set_style_bg_color(root, background(lv_color_hex(avg)), 0);
         });
 
