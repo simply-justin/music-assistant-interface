@@ -6,10 +6,42 @@ namespace ma {
 
 void Session::set_connection(Connection c) {
     connection_ = c;
+    if (c == Connection::Connected) {
+        auto waiting = std::move(waiting_);
+        waiting_.clear();
+        for (auto& [req, done] : waiting) send_now(std::move(req), std::move(done));
+    } else if (c != Connection::Connecting) {
+        fail_waiting();
+    }
     if (listener_.on_connection) listener_.on_connection(c, info_);
 }
 
+void Session::fail_waiting() {
+    auto waiting = std::move(waiting_);
+    waiting_.clear();
+    for (auto& [req, done] : waiting) {
+        Response r;
+        r.error_code = "disconnected";
+        if (done) done(std::move(r));
+    }
+}
+
 void Session::request(Request req, Backend::Done done) {
+    // The server rejects everything but `auth` until authenticated (verified 2.10).
+    if (connection_ == Connection::Connecting && req.command != "auth") {
+        waiting_.emplace_back(std::move(req), std::move(done));
+        return;
+    }
+    if (connection_ != Connection::Connected && req.command != "auth") {
+        Response r;
+        r.error_code = "disconnected";
+        if (done) done(std::move(r));
+        return;
+    }
+    send_now(std::move(req), std::move(done));
+}
+
+void Session::send_now(Request req, Backend::Done done) {
     std::string id = std::to_string(next_id_++);
     Json msg(cJSON_CreateObject());
     cJSON_AddStringToObject(msg.get(), "message_id", id.c_str());

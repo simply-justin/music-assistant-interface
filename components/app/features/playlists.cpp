@@ -27,13 +27,18 @@ public:
             load();
         } else if (auto* a = std::get_if<cmd::AddToPlaylist>(&c)) {
             if (!guard_.allow("pl|" + a->playlist.item_id + "|" + a->item.uri, ctx_.now_ms)) return;
-            std::string name = a->playlist.name;
-            ctx_.send(ma::cmd::playlist_add_tracks(a->playlist.item_id, {a->item.uri}),
-                      [this, name](backend::Response&&) { ctx_.toast(i18n::tr(i18n::Str::toast_added_to_playlist, name)); });
+            auto playlist = a->playlist;
+            ctx_.send(ma::cmd::playlist_add_tracks(playlist.item_id, {a->item.uri}), [this, playlist](backend::Response&&) {
+                ctx_.toast(i18n::tr(i18n::Str::toast_added_to_playlist, playlist.name));
+                ctx_.dispatch(cmd::Browse{cmd::BrowseKind::PlaylistTracks, playlist});  // refresh an open detail
+            });
         } else if (auto* n = std::get_if<cmd::CreatePlaylist>(&c)) {
             create(*n);
         } else if (auto* r = std::get_if<cmd::RemoveFromPlaylist>(&c)) {
-            ctx_.send(ma::cmd::playlist_remove_tracks(r->playlist.item_id, {r->position}));
+            auto playlist = r->playlist;
+            ctx_.send(ma::cmd::playlist_remove_tracks(playlist.item_id, {r->position}), [this, playlist](backend::Response&&) {
+                ctx_.dispatch(cmd::Browse{cmd::BrowseKind::PlaylistTracks, playlist});
+            });
         } else if (auto* d = std::get_if<cmd::DeletePlaylist>(&c)) {
             ctx_.send(ma::cmd::playlist_delete(d->playlist.item_id), [this](backend::Response&&) {
                 ctx_.toast(i18n::tr(i18n::Str::toast_playlist_deleted));

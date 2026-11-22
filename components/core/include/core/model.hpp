@@ -89,6 +89,7 @@ struct QueueState {
     bool shuffle = false;
     RepeatMode repeat = RepeatMode::Off;
     uint32_t elapsed_s = 0;
+    std::optional<QueueItem> current;  // what is playing now (may be outside `items` when shuffled)
     std::vector<QueueItem> items;
 };
 

@@ -36,6 +36,12 @@ backend::Request group_volume(const std::string& player_id, int volume_level);
 backend::Request volume_set(const std::string& player_id, int volume_level);
 backend::Request favorite_add(const std::string& uri);
 backend::Request favorite_remove(core::MediaType type, const std::string& library_item_id);
+// Browsing.
+backend::Request recently_played(int limit);
+backend::Request album_tracks(const core::MediaItem& album);
+backend::Request artist_tracks(const core::MediaItem& artist);
+backend::Request artist_albums(const core::MediaItem& artist);
+backend::Request playlist_tracks(const core::MediaItem& playlist);
 // Playlists (library ids, i.e. items with provider "library").
 backend::Request playlist_add_tracks(const std::string& playlist_id, const std::vector<std::string>& uris);
 backend::Request playlist_remove_tracks(const std::string& playlist_id, const std::vector<int>& positions);

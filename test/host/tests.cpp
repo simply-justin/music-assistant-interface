@@ -12,6 +12,7 @@
 #include "core/search.hpp"
 #include "core/text.hpp"
 #include "i18n/i18n.hpp"
+#include "text.hpp"
 
 static int g_failed = 0;
 #define CHECK(cond)                                                    \
@@ -156,23 +157,33 @@ static void test_ma_session() {
     std::vector<backend::Connection> states;
     s.set_listener({[](backend::Event&&) {}, [&](backend::Connection c, const backend::ServerInfo&) { states.push_back(c); }});
 
+    // Before the socket is up: fails at once. After it opened but before auth: waits.
+    std::string early;
+    s.request(ma::cmd::players_all(), [&](backend::Response&& r) { early = r.error_code; });
+    CHECK(early == "disconnected" && sent.empty());
     s.on_open();
+    bool waited = false;
+    s.request(ma::cmd::players_all(), [&](backend::Response&& r) { waited = r.ok; });
+    CHECK(sent.empty());
     s.on_text(R"({"server_id":"x","server_version":"2.7.0","schema_version":28})");
     CHECK(sent.size() == 1 && sent[0].find("\"command\":\"auth\"") != std::string::npos);
     CHECK(sent[0].find("\"token\":\"secret\"") != std::string::npos);
     s.on_text(R"({"message_id":"1","result":{}})");
     CHECK(s.connection() == backend::Connection::Connected);
+    CHECK(sent.size() == 2 && sent[1].find("players/all") != std::string::npos);  // flushed after auth
+    s.on_text(R"({"message_id":"2","result":[]})");
+    CHECK(waited);
     CHECK(s.server_info().server_version == "2.7.0");
 
     // Partial results are joined; errors are reported; unknown ids ignored.
     int total = -1;
     s.request(ma::cmd::players_all(), [&](backend::Response&& r) { total = cJSON_GetArraySize(r.result.get()); });
-    s.on_text(R"({"message_id":"2","result":[1,2],"partial":true})");
-    s.on_text(R"({"message_id":"2","result":[3]})");
+    s.on_text(R"({"message_id":"3","result":[1,2],"partial":true})");
+    s.on_text(R"({"message_id":"3","result":[3]})");
     CHECK(total == 3);
     std::string err;
     s.request(ma::cmd::players_all(), [&](backend::Response&& r) { err = r.error_code; });
-    s.on_text(R"({"message_id":"3","error_code":"invalid_command","details":"nope"})");
+    s.on_text(R"({"message_id":"4","error_code":"invalid_command","details":"nope"})");
     CHECK(err == "invalid_command");
     s.on_text(R"({"message_id":"99","result":1})");
     s.on_text("not json");
@@ -313,6 +324,14 @@ static void test_app_with_mock() {
     i18n::set_language(i18n::Lang::en);
 }
 
+static void test_display_text() {
+    CHECK(ui::clean("Daydreams💭😌") == "Daydreams");
+    CHECK(ui::clean("My Childhood Mixtape👦🏽💽") == "My Childhood Mixtape");
+    CHECK(ui::clean("A 🍻 Night") == "A Night");
+    CHECK(ui::clean("Beyoncé – Déjà Vu") == "Beyoncé – Déjà Vu");  // accents and dashes stay
+    CHECK(ui::duration(242) == "4:02" && ui::duration(3723) == "1:02:03" && ui::duration(0) == "0:00");
+}
+
 static void test_repeat_guard() {
     RepeatGuard g;
     CHECK(g.allow("a", 0));
@@ -331,6 +350,7 @@ int main() {
     test_i18n();
     test_app_with_mock();
     test_repeat_guard();
+    test_display_text();
     std::printf(g_failed ? "%d check(s) FAILED\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;
 }

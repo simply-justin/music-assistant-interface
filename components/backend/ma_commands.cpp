@@ -169,6 +169,25 @@ Request favorite_remove(core::MediaType type, const std::string& library_item_id
     return r;
 }
 
+namespace {
+Request on_item(const char* command, const core::MediaItem& item) {
+    Request r = make(command);
+    cJSON_AddStringToObject(r.args.get(), "item_id", item.item_id.c_str());
+    cJSON_AddStringToObject(r.args.get(), "provider_instance_id_or_domain", item.provider.c_str());
+    return r;
+}
+}  // namespace
+
+Request recently_played(int limit) {
+    Request r = make("music/recently_played_items");
+    cJSON_AddNumberToObject(r.args.get(), "limit", limit);
+    return r;
+}
+Request album_tracks(const core::MediaItem& album) { return on_item("music/albums/album_tracks", album); }
+Request artist_tracks(const core::MediaItem& artist) { return on_item("music/artists/artist_tracks", artist); }
+Request artist_albums(const core::MediaItem& artist) { return on_item("music/artists/artist_albums", artist); }
+Request playlist_tracks(const core::MediaItem& playlist) { return on_item("music/playlists/playlist_tracks", playlist); }
+
 Request playlist_add_tracks(const std::string& playlist_id, const std::vector<std::string>& uris) {
     Request r = make("music/playlists/add_playlist_tracks");
     cJSON_AddStringToObject(r.args.get(), "db_playlist_id", playlist_id.c_str());
@@ -341,6 +360,9 @@ void queue_state(const cJSON* o, core::QueueState& q) {
     std::string repeat = json_str(o, "repeat_mode");
     q.repeat = repeat == "one" ? core::RepeatMode::One : repeat == "all" ? core::RepeatMode::All : core::RepeatMode::Off;
     q.elapsed_s = static_cast<uint32_t>(json_num(o, "elapsed_time"));
+    const cJSON* current = cJSON_GetObjectItemCaseSensitive(o, "current_item");
+    if (cJSON_IsObject(current)) q.current = queue_item(current);
+    else q.current.reset();
 }
 
 }  // namespace ma::parse

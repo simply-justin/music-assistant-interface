@@ -30,6 +30,8 @@ private:
     void later(uint32_t delay_ms, std::function<void()> fn);
     Response handle(const Request& req);
     void emit(const char* event, const std::string& object_id, Json data);
+    void add_to_queue(const std::string& uri);
+    Json queue_object(const std::string& queue_id) const;
 
     MockLatency latency_;
     Listener listener_;

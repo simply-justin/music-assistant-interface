@@ -7,7 +7,8 @@ namespace app {
 void Context::send(backend::Request req, std::function<void(backend::Response&&)> on_ok) {
     backend.request(std::move(req), [this, on_ok = std::move(on_ok)](backend::Response&& r) {
         if (!r.ok) {
-            if (r.error_code != "disconnected") toast(i18n::tr(i18n::Str::toast_command_failed));
+            if (r.error_code != "disconnected")
+                publish(Toast{i18n::tr(i18n::Str::toast_command_failed), std::nullopt, {}, true});
             return;  // disconnects are shown by the connection banner instead
         }
         if (on_ok) on_ok(std::move(r));
@@ -36,7 +37,7 @@ void App::start() {
             // Remember the first server we trusted; ma::Session refuses a different one later.
             if (c == backend::Connection::Connected && !info.server_id.empty() && ctx_.settings.get("server_id").empty())
                 ctx_.settings.set("server_id", info.server_id);
-            ctx_.publish(ConnectionView{c, info});
+            ctx_.publish(ConnectionView{c, info});  // the UI reloads its lists when this says Connected
             if (c == backend::Connection::Connected)
                 for (auto& f : features_) f->on_connected();
         },

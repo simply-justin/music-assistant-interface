@@ -13,3 +13,97 @@ toast_command_failed,That didn't work. Try again.,Dat lukte niet. Probeer opnieu
 toast_added_to_playlist,Added to {},Toegevoegd aan {}
 toast_playlist_created,Playlist {} created,Afspeellijst {} gemaakt
 toast_playlist_deleted,Playlist deleted,Afspeellijst verwijderd
+nav_home,Home,Home
+nav_search,Search,Zoeken
+nav_library,Library,Bibliotheek
+nav_queue,Queue,Wachtrij
+nav_settings,Settings,Instellingen
+home_morning,Good morning,Goedemorgen
+home_afternoon,Good afternoon,Goedemiddag
+home_evening,Good evening,Goedenavond
+home_connected,Connected,Verbonden
+home_reconnecting,Reconnecting…,Opnieuw verbinden…
+home_now_playing,Now playing,Nu speelt
+home_nothing_playing,Nothing playing,Er speelt niets
+home_pick_favourite,Tap a favourite to start the music.,Tik op een favoriet om muziek te starten.
+home_recently_played,Recently played,Onlangs gespeeld
+home_your_playlists,Your playlists,Je afspeellijsten
+home_see_all,See all,Alles
+list_empty,Nothing here yet,Hier staat nog niets
+list_loading,Loading…,Laden…
+speaker_none,Choose speaker,Kies speaker
+speakers_title,Play music on,Muziek afspelen op
+np_title,Now playing,Nu speelt
+np_live,LIVE,LIVE
+np_up_next,Up next,Hierna
+search_placeholder,"Songs, artists, albums, radio","Nummers, artiesten, albums, radio"
+search_hint,"Search everything at once: your library, Spotify, YouTube Music and radio.","Zoek overal tegelijk: je bibliotheek, Spotify, YouTube Music en radio."
+search_loading,Searching…,Zoeken…
+search_partial,"From your library, still searching everywhere…","Uit je bibliotheek, nog overal aan het zoeken…"
+search_error,Search didn't work. Try again.,Zoeken lukte niet. Probeer opnieuw.
+search_some_failed,Some services didn't answer; results may be incomplete.,Sommige diensten reageerden niet; resultaten zijn misschien onvolledig.
+search_no_results,No results for “{}”,Geen resultaten voor “{}”
+search_top_result,Top result,Beste resultaat
+search_albums_playlists,Albums & playlists,Albums en afspeellijsten
+filter_all,All,Alles
+filter_tracks,Tracks,Nummers
+filter_artists,Artists,Artiesten
+filter_albums,Albums,Albums
+filter_playlists,Playlists,Afspeellijsten
+filter_radio,Radio,Radio
+lib_favourites,Favourites,Favorieten
+key_delete,Delete,Wissen
+key_search,Search,Zoek
+key_space,space,spatie
+key_done,Done,Klaar
+queue_up_next,Up next,Hierna
+count_song,{} song,{} nummer
+count_songs,{} songs,{} nummers
+queue_shuffle,Shuffle,Shuffle
+queue_clear,Clear,Wissen
+queue_clear_title,Clear up next?,Wachtrij wissen?
+queue_clear_body,Removes the {} songs up next. The current song keeps playing.,Verwijdert de {} volgende nummers. Het huidige nummer blijft spelen.
+queue_clear_keep,Keep,Behouden
+queue_clear_go,Clear up next,Wissen
+queue_empty,Nothing up next. Add songs from Search or the Library.,Er staat niets klaar. Voeg nummers toe via Zoeken of de Bibliotheek.
+queue_unavailable,Unavailable,Niet beschikbaar
+queue_playing_on,Playing on {},Speelt op {}
+queue_move_up,Move up,Omhoog
+queue_move_down,Move down,Omlaag
+menu_play_now,Play now,Nu afspelen
+menu_play_next,Play next,Hierna afspelen
+menu_add_to_queue,Add to queue,Aan wachtrij toevoegen
+menu_add_to_playlist,Add to playlist,Aan afspeellijst toevoegen
+menu_add_favourite,Add to favourites,Aan favorieten toevoegen
+menu_remove_favourite,Remove from favourites,Uit favorieten verwijderen
+menu_go_album,Go to album,Naar album
+menu_go_artist,Go to artist,Naar artiest
+menu_play_from,Play from,Afspelen vanaf
+menu_your_library,Your library,Je bibliotheek
+playlist_new,New playlist,Nieuwe afspeellijst
+playlist_create,Create,Maken
+playlist_create_add,Create and add {},Maken en {} toevoegen
+playlist_only_editable,Only playlists you can change are listed.,Alleen afspeellijsten die je kunt aanpassen staan hier.
+detail_play,Play,Afspelen
+detail_edit,Edit,Bewerken
+edit_hint,Editing · tap × to remove a song,Bewerken · tik op × om een nummer te verwijderen
+edit_done,Done,Klaar
+edit_delete,Delete playlist,Afspeellijst verwijderen
+edit_delete_title,Delete {}?,{} verwijderen?
+edit_delete_body,The playlist is removed from Music Assistant. The songs in it stay in your library.,De afspeellijst wordt uit Music Assistant verwijderd. De nummers blijven in je bibliotheek.
+edit_delete_keep,Cancel,Annuleren
+type_album,Album,Album
+type_artist,Artist,Artiest
+type_playlist,Playlist,Afspeellijst
+volume_each_speaker,Each speaker,Per speaker
+volume_hint,The top slider moves all speakers together. − and + step by 5.,De bovenste schuif regelt alle speakers samen. − en + verspringen per 5.
+settings_play_on,Play music on,Muziek afspelen op
+settings_this_panel,This panel,Dit scherm
+settings_language,Language,Taal
+settings_server,Music Assistant,Music Assistant
+language_name_self,English,Nederlands
+type_radio,Radio,Radio
+tag_source,+{} source,+{} bron
+tag_sources,+{} sources,+{} bronnen
+provider_files,Files,Bestanden
+volume_hint_single,− and + step by 5.,− en + verspringen per 5.

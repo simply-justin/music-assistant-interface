@@ -6,6 +6,7 @@
 //   in:  {message_id, result, partial?} | {message_id, error_code, details}
 //        {event, object_id, data} | server_info {server_version, schema_version, ...}
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <string>
@@ -43,6 +44,8 @@ private:
     };
 
     void set_connection(backend::Connection c);
+    void send_now(backend::Request req, backend::Backend::Done done);
+    void fail_waiting();
     void on_server_info(const cJSON* msg);
     void on_response(const std::string& id, const cJSON* msg);
 
@@ -51,6 +54,8 @@ private:
     std::string expected_server_id_;
     backend::Backend::Listener listener_;
     std::map<std::string, Pending> pending_;
+    // Requests made after the socket opened but before auth finished; sent once connected.
+    std::deque<std::pair<backend::Request, backend::Backend::Done>> waiting_;
     uint32_t next_id_ = 1;
     backend::Connection connection_ = backend::Connection::Disconnected;
     backend::ServerInfo info_;

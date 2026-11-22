@@ -24,6 +24,9 @@ public:
         } else if (ev.name == "queue_updated" && ev.data) {
             ma::parse::queue_state(ev.data.get(), queue_);
             publish();
+        } else if (ev.name == "queue_time_updated" && cJSON_IsNumber(ev.data.get())) {
+            queue_.elapsed_s = static_cast<uint32_t>(ev.data->valuedouble);  // verify: data is the elapsed seconds
+            publish();
         }
     }
 

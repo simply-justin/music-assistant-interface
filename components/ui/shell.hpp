@@ -1,0 +1,77 @@
+#pragma once
+// Internal: shared UI state, the Screen interface and helpers for screens and overlays.
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+
+#include "i18n/i18n.hpp"
+#include "kit.hpp"
+#include "ui/ui.hpp"
+
+namespace ui {
+
+// What changed, so a screen can skip work (e.g. a progress tick must not rebuild lists).
+enum class Topic : uint8_t { All, Connection, Players, Queue, Progress, Search, Playlists, Browse };
+
+// Latest snapshot of every core view.
+struct State {
+    app::ConnectionView connection;
+    std::shared_ptr<const app::PlayersView> players;
+    std::shared_ptr<const core::QueueState> queue;
+    std::shared_ptr<const core::SearchView> search;
+    std::shared_ptr<const app::PlaylistsView> playlists;
+    std::map<std::string, std::shared_ptr<const app::BrowseView>> lists;  // key: browse_key()
+    uint32_t elapsed_s = 0;  // local 1 Hz clock, re-synced from the queue
+
+    const core::PlayerState* selected() const;
+    std::optional<core::MediaItem> now_playing() const;  // current queue item's media
+    bool playing() const;
+    const app::BrowseView* list(app::cmd::BrowseKind kind, const std::string& of_uri = "") const;
+};
+
+std::string browse_key(app::cmd::BrowseKind kind, const std::string& of_uri);
+
+State& state();
+void send(app::Command command);
+using i18n::tr;
+
+class Screen {
+public:
+    virtual ~Screen() = default;
+    virtual void build(lv_obj_t* root) = 0;  // once (and again after a language change)
+    virtual void refresh(Topic topic) = 0;   // state changed while visible, or just shown (Topic::All)
+    virtual void on_open() {}                // navigated to: request data here
+    virtual bool full_screen() const { return false; }  // covers the rail (Now Playing)
+    virtual bool mini_player() const { return true; }
+    virtual ScreenId tab() const = 0;        // highlighted rail item
+    virtual std::string title() const = 0;   // label for the next screen's back chip
+};
+
+std::unique_ptr<Screen> make_home();
+std::unique_ptr<Screen> make_search();
+std::unique_ptr<Screen> make_library();
+std::unique_ptr<Screen> make_queue();
+std::unique_ptr<Screen> make_settings();
+std::unique_ptr<Screen> make_now_playing();
+std::unique_ptr<Screen> make_detail();
+
+// Navigation for screens.
+void back();
+std::string back_label();  // "Library", "Search", ...
+void set_detail_item(const core::MediaItem& item);
+const core::MediaItem& detail_item();
+
+// Overlays (overlays.cpp).
+void open_add_to_playlist(const core::MediaItem& item);
+void open_new_playlist(std::optional<core::MediaItem> first_item);
+void confirm(const std::string& title, const std::string& body, const std::string& keep, const std::string& go,
+             kit::Action on_go);
+
+// Shared bits used by several screens.
+std::string songs(size_t count);  // "1 song", "14 songs" / "1 nummer", "14 nummers"
+lv_obj_t* speaker_chip(lv_obj_t* parent);
+void play(const core::MediaItem& item);  // Play now (tap on a row/card that plays)
+void open_item(const core::MediaItem& item);  // tap: tracks/radio play, others open their detail
+
+}  // namespace ui

@@ -27,6 +27,12 @@ struct MoveInQueue { std::string queue_item_id; int shift; };
 struct PlayQueueIndex { int index; };
 struct SetFavourite { core::MediaItem item; bool on; };
 struct SetLanguage { i18n::Lang lang; };
+// Lists the UI shows. Adding a list = one enum value + one case in features/browse.cpp.
+enum class BrowseKind : uint8_t {
+    Favourites, RecentlyPlayed, LibraryAlbums, LibraryArtists, LibraryTracks, LibraryRadio,
+    AlbumTracks, ArtistTracks, ArtistAlbums, PlaylistTracks,
+};
+struct Browse { BrowseKind kind; core::MediaItem of; };             // `of`: the album/artist/playlist
 struct LoadPlaylists {};                                             // library playlists for Home + picker
 struct AddToPlaylist { core::MediaItem playlist; core::MediaItem item; };
 struct CreatePlaylist { std::string name; std::optional<core::MediaItem> first_item; };
@@ -41,7 +47,7 @@ struct PlayerChanged { std::string player_id; };
 using Command = std::variant<cmd::Search, cmd::Play, cmd::AddToQueue, cmd::PlayPause, cmd::Next, cmd::Previous,
                              cmd::Seek, cmd::SetShuffle, cmd::SetRepeat, cmd::SelectPlayer, cmd::SetVolume,
                              cmd::ClearUpNext, cmd::RemoveFromQueue, cmd::MoveInQueue, cmd::PlayQueueIndex,
-                             cmd::SetFavourite, cmd::SetLanguage, cmd::LoadPlaylists, cmd::AddToPlaylist,
+                             cmd::SetFavourite, cmd::SetLanguage, cmd::Browse, cmd::LoadPlaylists, cmd::AddToPlaylist,
                              cmd::CreatePlaylist, cmd::RemoveFromPlaylist, cmd::DeletePlaylist, cmd::PlayerChanged>;
 
 }  // namespace app

@@ -32,6 +32,15 @@ constexpr const char* kCatalog = R"json([
   "provider_mappings":[{"item_id":"UCDPM_n1atn2ijUwHd0NNRQw","provider_domain":"ytmusic","provider_instance":"ytmusic--b2","available":true}]},
  {"media_type":"playlist","item_id":"p1","provider":"spotify--a1","name":"Coldplay Essentials","uri":"spotify://playlist/p1",
   "provider_mappings":[{"item_id":"p1","provider_domain":"spotify","provider_instance":"spotify--a1","available":true}]},
+ {"media_type":"album","item_id":"a1","provider":"library","name":"Parachutes","uri":"library://album/a1","favorite":true,
+  "artists":[{"item_id":"3","provider":"library","name":"Coldplay","uri":"library://artist/3"}]},
+ {"media_type":"album","item_id":"a2","provider":"library","name":"Currents","uri":"library://album/a2",
+  "artists":[{"item_id":"9","provider":"library","name":"Tame Impala","uri":"library://artist/9"}]},
+ {"media_type":"radio","item_id":"r2","provider":"library","name":"Radio Paradise","uri":"library://radio/r2","favorite":true},
+ {"media_type":"radio","item_id":"r3","provider":"library","name":"NPO Radio 2","uri":"library://radio/r3","favorite":true},
+ {"media_type":"playlist","item_id":"p2","provider":"library","name":"Friday Night Mix","uri":"library://playlist/p2","favorite":true,"is_editable":true},
+ {"media_type":"track","item_id":"t5","provider":"library","name":"Let It Happen","uri":"library://track/t5","duration":467,
+  "artists":[{"item_id":"9","provider":"library","name":"Tame Impala","uri":"library://artist/9"}]},
  {"media_type":"radio","item_id":"r1","provider":"tunein--c3","name":"Radio Coldplay","uri":"tunein://radio/r1",
   "provider_mappings":[{"item_id":"r1","provider_domain":"tunein","provider_instance":"tunein--c3","available":true}]}
 ])json";
@@ -68,7 +77,33 @@ cJSON* find_uri(const cJSON* list, const std::string& uri) {
 }  // namespace
 
 MockBackend::MockBackend(MockLatency latency)
-    : latency_(latency), catalog_(cJSON_Parse(kCatalog)), players_(cJSON_Parse(kPlayers)), queue_(cJSON_CreateArray()) {}
+    : latency_(latency), catalog_(cJSON_Parse(kCatalog)), players_(cJSON_Parse(kPlayers)), queue_(cJSON_CreateArray()) {
+    // Something is already playing, so every screen has content.
+    for (const char* uri : {"library://track/12", "spotify://track/7"}) add_to_queue(uri);
+}
+
+void MockBackend::add_to_queue(const std::string& uri) {
+    const cJSON* media = find_uri(catalog_.get(), uri);
+    if (!media) return;
+    cJSON* qi = cJSON_CreateObject();
+    cJSON_AddStringToObject(qi, "queue_item_id", ("q" + std::to_string(next_queue_item_++)).c_str());
+    cJSON_AddStringToObject(qi, "name", json_str(media, "name").c_str());
+    cJSON_AddNumberToObject(qi, "duration", json_num(media, "duration"));
+    cJSON_AddItemToObject(qi, "media_item", cJSON_Duplicate(media, true));
+    cJSON_AddItemToArray(queue_.get(), qi);
+}
+
+Json MockBackend::queue_object(const std::string& queue_id) const {
+    Json q(cJSON_CreateObject());
+    cJSON_AddStringToObject(q.get(), "queue_id", queue_id.c_str());
+    bool empty = cJSON_GetArraySize(queue_.get()) == 0;
+    cJSON_AddNumberToObject(q.get(), "current_index", empty ? -1 : 0);
+    cJSON_AddBoolToObject(q.get(), "shuffle_enabled", false);
+    cJSON_AddStringToObject(q.get(), "repeat_mode", "off");
+    cJSON_AddNumberToObject(q.get(), "elapsed_time", empty ? 0 : 92);
+    if (!empty) cJSON_AddItemToObject(q.get(), "current_item", cJSON_Duplicate(cJSON_GetArrayItem(queue_.get(), 0), true));
+    return q;
+}
 
 void MockBackend::later(uint32_t delay_ms, std::function<void()> fn) {
     deliveries_.push_back({now_ms_ + delay_ms, std::move(fn)});
@@ -147,6 +182,28 @@ Response MockBackend::handle(const Request& req) {
         cJSON_AddStringToObject(r.result.get(), "provider", "library");
         cJSON_AddStringToObject(r.result.get(), "name", json_str(args, "name").c_str());
         cJSON_AddBoolToObject(r.result.get(), "is_editable", true);
+    } else if (c.rfind("music/", 0) == 0 && c.size() > 14 && c.compare(c.size() - 14, 14, "/library_items") == 0) {
+        // music/<type>s/library_items: catalog items of that type that are in the library (or favourites)
+        std::string type = c.substr(6, c.find('/', 6) - 6);
+        if (type == "radios") type = "radio";
+        else type.pop_back();  // tracks -> track
+        bool favourites = json_bool(args, "favorite");
+        r.result.reset(cJSON_CreateArray());
+        const cJSON* item;
+        cJSON_ArrayForEach(item, catalog_.get()) {
+            if (json_str(item, "media_type") != type) continue;
+            if (favourites ? !json_bool(item, "favorite") : json_str(item, "provider") != "library") continue;
+            cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
+        }
+    } else if (c == "music/recently_played_items" || c == "music/playlists/playlist_tracks" ||
+               c == "music/albums/album_tracks" || c == "music/artists/artist_tracks") {
+        r.result.reset(cJSON_CreateArray());
+        const cJSON* item;
+        cJSON_ArrayForEach(item, catalog_.get()) {
+            if (json_str(item, "media_type") == "track") cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
+        }
+    } else if (c == "player_queues/get_active_queue") {
+        r.result = queue_object(json_str(args, "player_id"));
     } else if (c == "players/all") {
         r.result.reset(cJSON_Duplicate(players_.get(), true));
     } else if (c == "player_queues/items") {
@@ -155,17 +212,9 @@ Response MockBackend::handle(const Request& req) {
         std::string option = json_str(args, "option");
         if (option != "add" && option != "next") queue_.reset(cJSON_CreateArray());
         const cJSON* uri;
-        cJSON_ArrayForEach(uri, cJSON_GetObjectItemCaseSensitive(args, "media")) {
-            const cJSON* media = find_uri(catalog_.get(), uri->valuestring);
-            if (!media) continue;
-            cJSON* qi = cJSON_CreateObject();
-            cJSON_AddStringToObject(qi, "queue_item_id", ("q" + std::to_string(next_queue_item_++)).c_str());
-            cJSON_AddStringToObject(qi, "name", json_str(media, "name").c_str());
-            cJSON_AddNumberToObject(qi, "duration", json_num(media, "duration"));
-            cJSON_AddItemToObject(qi, "media_item", cJSON_Duplicate(media, true));
-            cJSON_AddItemToArray(queue_.get(), qi);
-        }
+        cJSON_ArrayForEach(uri, cJSON_GetObjectItemCaseSensitive(args, "media")) add_to_queue(uri->valuestring);
         emit("queue_items_updated", json_str(args, "queue_id"), nullptr);
+        emit("queue_updated", json_str(args, "queue_id"), queue_object(json_str(args, "queue_id")));
     } else if (c == "player_queues/clear") {
         // Mirrors the decision: the current (first) item keeps playing.
         while (cJSON_GetArraySize(queue_.get()) > 1) cJSON_DeleteItemFromArray(queue_.get(), 1);
