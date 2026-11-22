@@ -52,6 +52,13 @@ public:
             display_sub = d.dim_after_s ? i18n::tr(i18n::Str::settings_dims_after, dim_label(d.dim_after_s)) : tr(i18n::Str::dim_never);
             if (d.night) display_sub += " · " + i18n::tr(i18n::Str::settings_night_range, clock_text(d.night_from) + "–" + clock_text(d.night_to));
         }
+        if (pv) {
+            const auto& a = pv->appearance;
+            static const i18n::Str rounds[] = {i18n::Str::round_sharp, i18n::Str::round_normal, i18n::Str::round_round};
+            std::string look = std::string(tr(a.mode == app::ThemeMode::Light ? i18n::Str::appearance_light : i18n::Str::appearance_dark)) +
+                               " · " + tr(rounds[static_cast<int>(a.roundness)]);
+            nav_row(panel, icon::eye, tr(i18n::Str::page_appearance), look, [] { open_settings_page(SettingsPage::Appearance); });
+        }
         nav_row(panel, icon::sun, tr(i18n::Str::page_display), display_sub, [] { open_settings_page(SettingsPage::Display); });
         nav_row(panel, icon::wifi, tr(i18n::Str::page_wifi), pv && pv->wifi.connected ? pv->wifi.ssid : tr(i18n::Str::wifi_not_connected),
                 [] { open_settings_page(SettingsPage::Wifi); });

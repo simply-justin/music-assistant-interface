@@ -1,6 +1,8 @@
 #include "artwork.hpp"
 
 #include <map>
+
+#include "theme.hpp"
 #include <vector>
 
 namespace ui {
@@ -37,6 +39,7 @@ void show(lv_obj_t* box, const std::string& key, std::shared_ptr<img::Bitmap> bm
     lv_obj_t* image = lv_image_create(box);
     lv_image_set_src(image, &s->dsc);
     lv_obj_center(image);
+    lv_obj_fade_in(image, 150, 0);  // micro-animation: opacity on this one image only, not its container
     art_state().cache.pin(key);
     lv_obj_add_event_cb(image, [](lv_event_t* e) {
         auto* s = static_cast<Shown*>(lv_event_get_user_data(e));
@@ -63,7 +66,7 @@ void attach(lv_obj_t* box, const core::MediaItem& item, int w, int h, int radius
     std::string url = img::proxy_url(a.base, *item.image, std::max(w, h));
     if (url.empty()) return;
     // With on_ready (Now Playing) the art sits on its own derived background: bake against that.
-    uint32_t bg_rgb = on_ready ? img::kBgFromArt : lv_color_to_u32(bg) & 0xFFFFFF;
+    uint32_t bg_rgb = on_ready ? (theme::light() ? img::kBgFromArtLight : img::kBgFromArt) : lv_color_to_u32(bg) & 0xFFFFFF;
     std::string key = url + "|" + std::to_string(w) + "x" + std::to_string(h) + "|" + std::to_string(radius) + "|" + std::to_string(bg_rgb);
 
     if (auto hit = a.cache.get(key)) {

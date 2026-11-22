@@ -64,6 +64,7 @@ struct Provider {
 struct PanelView {
     DisplaySettings display;
     Diagnostics diagnostics;
+    Appearance appearance;
     bool night_now = false, dimmed = false;
     WifiStatus wifi;
     SystemInfo system;

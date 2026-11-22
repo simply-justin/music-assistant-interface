@@ -232,5 +232,22 @@ int main(int argc, char** argv) {
     run(300);
     ui::open(ui::ScreenId::Home);
     shot("19_home_dutch");
+    core.handle(app::cmd::SetLanguage{i18n::Lang::en});
+    ui::open_settings_page(ui::SettingsPage::Appearance);
+    shot("20_appearance");
+    core.handle(app::cmd::SetAppearance{app::Appearance{app::ThemeMode::Light, 0, app::Roundness::Normal}});
+    ui::open(ui::ScreenId::Home);
+    shot("21_light_home");
+    ui::open(ui::ScreenId::NowPlaying);
+    shot("22_light_now_playing");
+    ui::open(ui::ScreenId::Search);
+    shot("23_light_search");
+    ui::open_settings_page(ui::SettingsPage::Appearance);
+    shot("24_light_appearance");
+    core.handle(app::cmd::SetAppearance{app::Appearance{app::ThemeMode::Dark, 1, app::Roundness::Round}});
+    ui::open(ui::ScreenId::Home);
+    shot("25_dark_teal_round_home");
+    ui::open(ui::ScreenId::Library);
+    shot("26_dark_teal_round_library");
     return 0;
 }

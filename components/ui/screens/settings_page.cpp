@@ -46,6 +46,7 @@ public:
             case SettingsPage::Server: server(body); break;
             case SettingsPage::Language: language(body); break;
             case SettingsPage::About: about(body); break;
+            case SettingsPage::Appearance: appearance(body); break;
         }
     }
 
@@ -106,7 +107,7 @@ private:
         lv_obj_t* r = kit::row(col, 8);
         lv_obj_set_width(r, lv_pct(100));
         lv_obj_set_style_pad_all(r, 4, 0);
-        lv_obj_set_style_radius(r, theme::kRadiusControl, 0);
+        lv_obj_set_style_radius(r, theme::r_control(), 0);
         lv_obj_set_style_bg_color(r, theme::elevated(), 0);
         lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
         kit::icon_button(r, icon::minus, [minutes, set] { set((minutes + 24 * 60 - 15) % (24 * 60)); });
@@ -243,6 +244,101 @@ private:
             else lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
         }
         kit::text(c, tr(i18n::Str::language_hint), theme::meta(), theme::text3(), true);
+    }
+
+    // A selectable preview tile (theme / rounding): the selected one gets an accent ring.
+    static lv_obj_t* option(lv_obj_t* parent, const std::string& label, bool selected, kit::Action action) {
+        lv_obj_t* o = kit::column(parent, 10);
+        lv_obj_set_style_pad_all(o, 10, 0);
+        lv_obj_set_style_radius(o, theme::r_card(), 0);
+        lv_obj_set_style_border_width(o, selected ? 2 : 1, 0);
+        lv_obj_set_style_border_color(o, selected ? theme::accent() : theme::border(), 0);
+        lv_obj_set_style_bg_color(o, theme::surface(), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(o, LV_OPA_COVER, LV_STATE_PRESSED);
+        kit::press_scale(o);
+        kit::on_click(o, std::move(action));
+        lv_obj_t* l = kit::text(o, label, theme::meta(), selected ? theme::text() : theme::text2());
+        lv_obj_move_to_index(l, -1);
+        return o;
+    }
+
+    void appearance(lv_obj_t* body) {
+        title(body, i18n::Str::page_appearance);
+        const app::PanelView* pv = state().panel.get();
+        app::Appearance a = pv ? pv->appearance : app::Appearance{};
+        auto set = [](app::Appearance x) { send(app::cmd::SetAppearance{x}); };
+        lv_obj_t* cols = two_columns(body);
+
+        lv_obj_t* mode = half(cols, tr(i18n::Str::appearance_theme));
+        lv_obj_t* modes = kit::row(mode, 16);
+        for (auto m : {app::ThemeMode::Dark, app::ThemeMode::Light}) {
+            bool dark = m == app::ThemeMode::Dark;
+            lv_obj_t* o = option(modes, tr(dark ? i18n::Str::appearance_dark : i18n::Str::appearance_light), a.mode == m,
+                                 [a, m, set] { auto x = a; x.mode = m; set(x); });
+            // Mini preview of the theme: page, sidebar strip, a cover and two text lines.
+            lv_obj_t* pv_box = lv_obj_create(o);
+            lv_obj_remove_style_all(pv_box);
+            lv_obj_set_size(pv_box, 168, 96);
+            lv_obj_move_to_index(pv_box, 0);
+            lv_obj_set_style_radius(pv_box, theme::r_control(), 0);
+            lv_obj_set_style_clip_corner(pv_box, true, 0);
+            lv_obj_set_style_bg_opa(pv_box, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(pv_box, lv_color_hex(dark ? 0x0A0A0A : 0xF6F6F7), 0);
+            lv_obj_set_style_border_width(pv_box, 1, 0);
+            lv_obj_set_style_border_color(pv_box, theme::hairline(), 0);
+            auto block = [pv_box](int x, int y, int w, int h, uint32_t col, int r) {
+                lv_obj_t* b = lv_obj_create(pv_box);
+                lv_obj_remove_style_all(b);
+                lv_obj_set_pos(b, x, y);
+                lv_obj_set_size(b, w, h);
+                lv_obj_set_style_radius(b, r, 0);
+                lv_obj_set_style_bg_color(b, lv_color_hex(col), 0);
+                lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+            };
+            block(0, 0, 36, 96, dark ? 0x000000 : 0xFFFFFF, 0);
+            block(48, 14, 40, 40, 0xC9A227, 3);
+            block(98, 18, 56, 8, dark ? 0xFFFFFF : 0x111111, 2);
+            block(98, 32, 40, 6, dark ? 0xA3A3A3 : 0x52525B, 2);
+            block(48, 66, 106, 18, dark ? 0x161616 : 0xECECEE, 3);
+        }
+
+        lv_obj_t* accent = half(cols, tr(i18n::Str::appearance_accent));
+        lv_obj_t* sw = kit::row(accent, 14);
+        for (int i = 0; i < theme::accent_count(); ++i) {
+            lv_obj_t* dot = lv_obj_create(sw);
+            lv_obj_remove_style_all(dot);
+            lv_obj_set_size(dot, 48, 48);
+            lv_obj_set_ext_click_area(dot, 4);
+            lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(dot, theme::accent_swatch(i), 0);
+            lv_obj_set_style_border_width(dot, i == 0 ? 1 : 0, 0);  // the neutral swatch needs an edge on its own background
+            lv_obj_set_style_border_color(dot, theme::border(), 0);
+            if (a.accent == i) {
+                lv_obj_set_style_outline_width(dot, 3, 0);
+                lv_obj_set_style_outline_pad(dot, 3, 0);
+                lv_obj_set_style_outline_color(dot, theme::text(), 0);
+            }
+            kit::press_scale(dot);
+            kit::on_click(dot, [a, i, set] { auto x = a; x.accent = static_cast<uint8_t>(i); set(x); });
+        }
+        kit::text(accent, tr(i18n::Str::appearance_accent_hint), theme::label(), theme::text3(), true);
+
+        lv_obj_t* round = card(body, tr(i18n::Str::appearance_rounding));
+        lv_obj_t* rounds = kit::row(round, 16);
+        static const i18n::Str names[] = {i18n::Str::round_sharp, i18n::Str::round_normal, i18n::Str::round_round};
+        static const int32_t sample[] = {3, 10, 22};
+        for (int r = 0; r < 3; ++r) {
+            auto rr = static_cast<app::Roundness>(r);
+            lv_obj_t* o = option(rounds, tr(names[r]), a.roundness == rr, [a, rr, set] { auto x = a; x.roundness = rr; set(x); });
+            lv_obj_t* shape = lv_obj_create(o);
+            lv_obj_remove_style_all(shape);
+            lv_obj_set_size(shape, 120, 72);
+            lv_obj_move_to_index(shape, 0);
+            lv_obj_set_style_radius(shape, sample[r], 0);
+            lv_obj_set_style_bg_color(shape, theme::elevated(), 0);
+            lv_obj_set_style_bg_opa(shape, LV_OPA_COVER, 0);
+        }
     }
 
     void about(lv_obj_t* body) {

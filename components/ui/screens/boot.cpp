@@ -41,7 +41,7 @@ public:
     }
 
     bool full_screen() const override { return true; }
-    bool mini_player() const override { return false; }
+    bool player_bar() const override { return false; }
     ScreenId tab() const override { return ScreenId::Home; }
     std::string title() const override { return tr(i18n::Str::boot_title); }
 

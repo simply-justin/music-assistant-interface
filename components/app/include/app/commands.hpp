@@ -24,6 +24,16 @@ struct Diagnostics {
     bool fps = false, touches = false;
 };
 
+// Look of the panel (Settings › Appearance). accent: index into the UI's accent list (0 = neutral).
+enum class ThemeMode : uint8_t { Dark, Light };
+enum class Roundness : uint8_t { Sharp, Normal, Round };
+struct Appearance {
+    ThemeMode mode = ThemeMode::Dark;
+    uint8_t accent = 0;
+    Roundness roundness = Roundness::Normal;
+    bool operator==(const Appearance& o) const { return mode == o.mode && accent == o.accent && roundness == o.roundness; }
+};
+
 enum class SetupStep : uint8_t { Welcome, Wifi, WifiPassword, Server, SignIn, Speaker, Done, Finished };
 
 }  // namespace app
@@ -73,6 +83,7 @@ struct SetupFinish {};
 struct SetDisplay { DisplaySettings display; };
 struct SetDimmed { bool dimmed; };                                  // UI: idle → dimmed clock
 struct SetDiagnostics { Diagnostics diagnostics; };
+struct SetAppearance { Appearance appearance; };
 struct SetSourceOrder { std::vector<std::string> providers; };      // provider domains, best first
 struct Reconnect {};
 struct SignInAgain {};
@@ -90,7 +101,7 @@ using Command = std::variant<cmd::Search, cmd::Play, cmd::AddToQueue, cmd::PlayP
                              cmd::SetFavourite, cmd::SetLanguage, cmd::Browse, cmd::LoadPlaylists, cmd::AddToPlaylist,
                              cmd::CreatePlaylist, cmd::RemoveFromPlaylist, cmd::DeletePlaylist, cmd::SetupGo,
                              cmd::SetupScanWifi, cmd::SetupJoinWifi, cmd::SetupFindServers, cmd::SetupUseServer,
-                             cmd::SetupToken, cmd::SetupFinish, cmd::SetDisplay, cmd::SetDimmed, cmd::SetDiagnostics,
+                             cmd::SetupToken, cmd::SetupFinish, cmd::SetDisplay, cmd::SetDimmed, cmd::SetDiagnostics, cmd::SetAppearance,
                              cmd::SetSourceOrder, cmd::Reconnect, cmd::SignInAgain, cmd::RestartPanel, cmd::ResetPanel,
                              cmd::PlayerChanged>;
 

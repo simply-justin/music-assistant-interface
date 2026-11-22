@@ -28,7 +28,6 @@ public:
         build_right();
     }
 
-    bool mini_player() const override { return false; }
     ScreenId tab() const override { return ScreenId::Queue; }
     std::string title() const override { return tr(i18n::Str::nav_queue); }
 
@@ -40,7 +39,7 @@ private:
         if (!item) return;
         kit::overline(left_, tr(i18n::Str::home_now_playing));
         lv_obj_t* np = kit::column(left_, 16);
-        kit::art(np, *item, 340, theme::kRadiusArt);
+        kit::art(np, *item, 340, theme::r_art());
         kit::text(np, item->name, theme::h2(), theme::text());
         lv_obj_t* sub = kit::row(np, 8);
         kit::text(sub, kit::subtitle(*item), theme::body(), theme::text2());

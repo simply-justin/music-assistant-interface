@@ -50,6 +50,12 @@ public:
             s.set("diag_fps", g->diagnostics.fps ? "1" : "0");
             s.set("diag_touches", g->diagnostics.touches ? "1" : "0");
             publish();
+        } else if (auto* a = std::get_if<cmd::SetAppearance>(&c)) {
+            view_.appearance = a->appearance;
+            s.set("theme", a->appearance.mode == ThemeMode::Light ? "light" : "dark");
+            s.set("accent", std::to_string(a->appearance.accent));
+            s.set("round", std::to_string(static_cast<int>(a->appearance.roundness)));
+            publish();
         } else if (auto* o = std::get_if<cmd::SetSourceOrder>(&c)) {
             view_.source_order = o->providers;
             ctx_.prefs.provider_order = o->providers;
@@ -84,6 +90,9 @@ private:
         d.night_brightness = num("night_brightness", d.night_brightness);
         view_.display = d;
         view_.diagnostics = {num("diag_fps", 0) != 0, num("diag_touches", 0) != 0};
+        view_.appearance.mode = ctx_.settings.get("theme") == "light" ? ThemeMode::Light : ThemeMode::Dark;
+        view_.appearance.accent = static_cast<uint8_t>(num("accent", 0));
+        view_.appearance.roundness = static_cast<Roundness>(std::clamp(num("round", 1), 0, 2));
         view_.source_order = ctx_.prefs.provider_order;  // App::start loaded these
     }
 

@@ -46,8 +46,8 @@ public:
     virtual void build(lv_obj_t* root) = 0;  // once (and again after a language change)
     virtual void refresh(Topic topic) = 0;   // state changed while visible, or just shown (Topic::All)
     virtual void on_open() {}                // navigated to: request data here
-    virtual bool full_screen() const { return false; }  // covers the rail (Now Playing)
-    virtual bool mini_player() const { return true; }
+    virtual bool full_screen() const { return false; }  // covers the sidebar (Now Playing, setup)
+    virtual bool player_bar() const { return true; }   // the bottom player bar
     virtual ScreenId tab() const = 0;        // highlighted rail item
     virtual std::string title() const = 0;   // label for the next screen's back chip
 };

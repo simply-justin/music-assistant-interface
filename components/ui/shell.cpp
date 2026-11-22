@@ -20,9 +20,10 @@ struct Shell {
     std::vector<ScreenId> stack;                   // back stack, max 8
     ScreenId current = ScreenId::Home;
     lv_obj_t* base = nullptr;
-    lv_obj_t* rail = nullptr;
-    lv_obj_t* mini = nullptr;
-    std::vector<lv_obj_t*> rail_items;
+    lv_obj_t* side = nullptr;      // sidebar: speaker, menu, playlists, settings
+    lv_obj_t* bar = nullptr;       // player bar along the bottom
+    lv_obj_t* progress = nullptr;  // player bar progress (animated between 1 Hz ticks)
+    lv_obj_t* elapsed = nullptr;
     core::MediaItem detail;
     SettingsPage page = SettingsPage::Display;
     lv_obj_t* ambient = nullptr;
@@ -37,9 +38,16 @@ Shell& shell() {
 
 Screen& screen(ScreenId id) { return *shell().screens[static_cast<size_t>(id)]; }
 
-void build_rail();
-void build_mini();
-void refresh_mini();
+void build_sidebar();
+void refresh_bar();
+
+void layout_for(Screen& scr) {
+    auto& s = shell();
+    if (scr.full_screen()) lv_obj_add_flag(s.side, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(s.side, LV_OBJ_FLAG_HIDDEN);
+    if (scr.player_bar()) lv_obj_remove_flag(s.bar, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(s.bar, LV_OBJ_FLAG_HIDDEN);
+}
 
 void show(ScreenId id) {
     auto& s = shell();
@@ -49,139 +57,205 @@ void show(ScreenId id) {
         if (i == static_cast<size_t>(id)) lv_obj_remove_flag(s.roots[i], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(s.roots[i], LV_OBJ_FLAG_HIDDEN);
     }
-    if (scr.full_screen()) lv_obj_add_flag(s.rail, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_remove_flag(s.rail, LV_OBJ_FLAG_HIDDEN);
-    for (size_t i = 0; i < s.rail_items.size(); ++i) {
-        bool on = static_cast<size_t>(scr.tab()) == i;
-        lv_obj_set_style_border_width(s.rail_items[i], on ? 3 : 0, 0);
-        // Children don't inherit the state: colour icon (child 0) and label (child 1) directly.
-        lv_obj_set_style_text_color(lv_obj_get_child(s.rail_items[i], 0), on ? theme::accent() : theme::text2(), 0);
-        lv_obj_set_style_text_color(lv_obj_get_child(s.rail_items[i], 1), on ? theme::text() : theme::text2(), 0);
-    }
+    layout_for(scr);
     kit::close_sheets();
     scr.on_open();
     scr.refresh(Topic::All);
-    refresh_mini();
+    build_sidebar();  // selected item follows the screen
+    refresh_bar();
 }
 
 void build_all() {
     auto& s = shell();
     for (auto* r : s.roots) lv_obj_delete(r);
     s.roots.clear();
-    if (s.rail) lv_obj_delete(s.rail);
-    if (s.mini) lv_obj_delete(s.mini);
-    s.rail_items.clear();
+    if (s.side) lv_obj_delete(s.side);
+    if (s.bar) lv_obj_delete(s.bar);
+    lv_obj_set_style_bg_color(s.base, theme::bg(), 0);
 
     for (auto& scr : s.screens) {
         lv_obj_t* root = kit::column(s.base);
         bool full = scr->full_screen();
-        lv_obj_set_pos(root, full ? 0 : theme::kRailW, 0);
-        lv_obj_set_size(root, full ? theme::kScreenW : theme::kScreenW - theme::kRailW,
-                        theme::kScreenH - (scr->mini_player() ? theme::kMiniH : 0));
+        lv_obj_set_pos(root, full ? 0 : theme::kSideW, 0);
+        lv_obj_set_size(root, full ? theme::kScreenW : theme::kScreenW - theme::kSideW,
+                        theme::kScreenH - (scr->player_bar() ? theme::kBarH : 0));
         lv_obj_add_flag(root, LV_OBJ_FLAG_HIDDEN);
         scr->build(root);
         s.roots.push_back(root);
     }
-    build_rail();
-    build_mini();
+    s.side = kit::column(s.base, 0);
+    lv_obj_set_size(s.side, theme::kSideW, theme::kScreenH - theme::kBarH);
+    lv_obj_set_style_pad_hor(s.side, 12, 0);
+    lv_obj_set_style_pad_top(s.side, 20, 0);
+    lv_obj_set_style_pad_bottom(s.side, 12, 0);
+    lv_obj_set_style_bg_color(s.side, theme::side(), 0);
+    lv_obj_set_style_bg_opa(s.side, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_side(s.side, LV_BORDER_SIDE_RIGHT, 0);
+    lv_obj_set_style_border_width(s.side, 1, 0);
+    lv_obj_set_style_border_color(s.side, theme::hairline(), 0);
+
+    s.bar = kit::row(s.base, 24);
+    lv_obj_set_pos(s.bar, 0, theme::kScreenH - theme::kBarH);
+    lv_obj_set_size(s.bar, theme::kScreenW, theme::kBarH);
+    lv_obj_set_style_pad_hor(s.bar, 24, 0);
+    lv_obj_set_style_bg_color(s.bar, theme::side(), 0);
+    lv_obj_set_style_bg_opa(s.bar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_side(s.bar, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_set_style_border_width(s.bar, 1, 0);
+    lv_obj_set_style_border_color(s.bar, theme::hairline(), 0);
 }
 
-void build_rail() {
-    auto& s = shell();
-    s.rail = kit::column(s.base, 8);
-    lv_obj_set_size(s.rail, theme::kRailW, theme::kScreenH);
-    lv_obj_set_style_pad_ver(s.rail, 24, 0);
-    lv_obj_set_style_border_side(s.rail, LV_BORDER_SIDE_RIGHT, 0);
-    lv_obj_set_style_border_width(s.rail, 1, 0);
-    lv_obj_set_style_border_color(s.rail, theme::hairline(), 0);
-    lv_obj_set_flex_align(s.rail, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    struct Item { ScreenId id; const char* glyph; i18n::Str label; };
-    const Item items[] = {{ScreenId::Home, icon::home, i18n::Str::nav_home},
-                          {ScreenId::Search, icon::search, i18n::Str::nav_search},
-                          {ScreenId::Library, icon::library, i18n::Str::nav_library},
-                          {ScreenId::Queue, icon::queue, i18n::Str::nav_queue},
-                          {ScreenId::Settings, icon::settings, i18n::Str::nav_settings}};
-    for (const auto& it : items) {
-        if (it.id == ScreenId::Settings) kit::spacer(s.rail);
-        lv_obj_t* b = kit::column(s.rail, 4);
-        lv_obj_set_size(b, theme::kRailW, 76);  // wide enough for "Instellingen" at 14 px
-        lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        // Active item: a 3 px accent bar on the left (set in show()), no filled block.
-        lv_obj_set_style_border_side(b, LV_BORDER_SIDE_LEFT, 0);
-        lv_obj_set_style_border_color(b, theme::accent(), 0);
-        lv_obj_set_style_bg_color(b, theme::surface(), LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_STATE_PRESSED);
-        kit::icon(b, it.glyph, 28, theme::text2());
-        kit::text(b, tr(it.label), theme::label(), theme::text2());
-        ScreenId id = it.id;
-        kit::on_click(b, [id] { open(id); });
-        s.rail_items.push_back(b);
-    }
+// A sidebar menu item: 40 px visible (selected = filled block), 52 px tap area.
+lv_obj_t* side_item(lv_obj_t* parent, const char* glyph, const std::string& label, bool selected, kit::Action action) {
+    lv_obj_t* r = kit::row(parent, 12);
+    lv_obj_set_size(r, lv_pct(100), theme::kNavH);
+    lv_obj_set_ext_click_area(r, theme::kNavHit);
+    lv_obj_set_style_margin_bottom(r, 4, 0);
+    lv_obj_set_style_pad_hor(r, 12, 0);
+    lv_obj_set_style_radius(r, theme::r_control(), 0);
+    lv_obj_set_style_bg_color(r, theme::elevated(), 0);
+    lv_obj_set_style_bg_opa(r, selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(r, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
+    lv_color_t fg = selected ? theme::text() : theme::text3();
+    kit::icon(r, glyph, 22, fg);
+    kit::text(r, label, theme::meta(), fg);
+    kit::on_click(r, std::move(action));
+    return r;
 }
 
-// Mini-player (96 px): what's playing, transport, speaker, volume, queue. Hidden when idle.
-void build_mini() {
+void build_sidebar() {
     auto& s = shell();
-    s.mini = kit::row(s.base, 16);
-    lv_obj_set_pos(s.mini, theme::kRailW, theme::kScreenH - theme::kMiniH);
-    lv_obj_set_size(s.mini, theme::kScreenW - theme::kRailW, theme::kMiniH);
-    lv_obj_set_style_pad_hor(s.mini, 24, 0);
-    lv_obj_set_style_bg_color(s.mini, theme::surface(), 0);
-    lv_obj_set_style_bg_opa(s.mini, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_side(s.mini, LV_BORDER_SIDE_TOP, 0);
-    lv_obj_set_style_border_width(s.mini, 1, 0);
-    lv_obj_set_style_border_color(s.mini, theme::elevated(), 0);
-}
+    lv_obj_clean(s.side);
+    ScreenId tab = screen(s.current).tab();
 
-void refresh_mini() {
-    auto& s = shell();
-    Screen& scr = screen(s.current);
-    auto item = s.state.now_playing();
-    if (!scr.mini_player() || scr.full_screen() || !item) {
-        lv_obj_add_flag(s.mini, LV_OBJ_FLAG_HIDDEN);
-        return;
-    }
-    lv_obj_remove_flag(s.mini, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clean(s.mini);
-    // Progress strip (3 px) along the top edge.
-    lv_obj_t* bar = lv_bar_create(s.mini);
-    lv_obj_add_flag(bar, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_set_size(bar, theme::kScreenW - theme::kRailW, 3);
-    lv_obj_set_pos(bar, -24, -1);
-    lv_obj_set_style_radius(bar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(bar, 0, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa(bar, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(bar, theme::accent(), LV_PART_INDICATOR);
-    lv_bar_set_range(bar, 0, item->duration_s ? static_cast<int32_t>(item->duration_s) : 1);
-    lv_bar_set_value(bar, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_OFF);
-
-    lv_obj_t* info = kit::row(s.mini, 16);
-    lv_obj_set_width(info, 400);
-    kit::art(info, *item, 64, theme::kRadiusArt, theme::surface());
-    lv_obj_t* col = kit::column(info, 4);
+    // Speaker: which one plays, and whether it plays.
+    const core::PlayerState* p = s.state.selected();
+    lv_obj_t* spk = kit::row(s.side, 10);
+    lv_obj_set_size(spk, lv_pct(100), 48);
+    lv_obj_set_style_margin_bottom(spk, 14, 0);
+    lv_obj_set_style_pad_hor(spk, 12, 0);
+    lv_obj_set_style_radius(spk, theme::r_control(), 0);
+    lv_obj_set_style_border_width(spk, 1, 0);
+    lv_obj_set_style_border_color(spk, theme::border(), 0);
+    lv_obj_set_style_bg_color(spk, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(spk, LV_OPA_COVER, LV_STATE_PRESSED);
+    kit::icon(spk, icon::speaker, 22, theme::text2());
+    lv_obj_t* col = kit::column(spk, 0);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
-    kit::text(col, item->name, theme::body(), theme::text());
-    lv_obj_t* sub = kit::row(col, 8);
-    kit::text(sub, kit::subtitle(*item), theme::meta(), theme::text2());
-    kit::badge(sub, item->badge_provider());
-    kit::on_click(info, [] { open(ScreenId::NowPlaying); });
+    kit::text(col, p ? p->name : tr(i18n::Str::speaker_none), theme::label(), theme::text());
+    lv_obj_t* st = kit::row(col, 6);
+    if (s.state.playing()) kit::equalizer(st, theme::accent(), true);
+    kit::text(st, tr(s.state.playing() ? i18n::Str::side_playing : i18n::Str::side_idle), theme::label(), theme::text3());
+    kit::icon(spk, icon::chevron_down, 22, theme::text3());
+    kit::on_click(spk, [] { open_speakers(); });
 
-    lv_obj_t* mid = kit::row(s.mini, 12);
+    struct Item { ScreenId id; const char* glyph; i18n::Str label; };
+    for (const Item& it : {Item{ScreenId::Home, icon::home, i18n::Str::nav_home}, Item{ScreenId::Search, icon::search, i18n::Str::nav_search},
+                           Item{ScreenId::Library, icon::library, i18n::Str::nav_library}, Item{ScreenId::Queue, icon::queue, i18n::Str::nav_queue}}) {
+        ScreenId id = it.id;
+        side_item(s.side, it.glyph, tr(it.label), tab == id, [id] { open(id); });
+    }
+
+    // Your playlists (as many as fit).
+    if (s.state.playlists && !s.state.playlists->playlists.empty()) {
+        lv_obj_t* ov = kit::overline(s.side, tr(i18n::Str::side_playlists), theme::text3());
+        lv_obj_set_style_margin_top(ov, 18, 0);
+        lv_obj_set_style_margin_bottom(ov, 4, 0);
+        lv_obj_set_style_pad_left(ov, 12, 0);
+        size_t n = 0;
+        for (const auto& pl : s.state.playlists->playlists) {
+            if (++n > 6) break;
+            lv_obj_t* r = kit::row(s.side, 12);
+            lv_obj_set_size(r, lv_pct(100), 44);
+            lv_obj_set_style_pad_hor(r, 6, 0);
+            lv_obj_set_style_radius(r, theme::r_control(), 0);
+            lv_obj_set_style_bg_color(r, theme::surface(), LV_STATE_PRESSED);
+            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
+            kit::art(r, pl, 32, std::min<int32_t>(theme::r_art(), 6), theme::side());
+            lv_obj_t* name = kit::text(r, pl.name, theme::label(), theme::text2());
+            lv_obj_set_flex_grow(name, 1);
+            lv_obj_set_width(name, 1);
+            auto item = pl;
+            kit::on_click(r, [item] { open_detail(item); });
+        }
+    }
+    kit::spacer(s.side);
+    side_item(s.side, icon::settings, tr(i18n::Str::nav_settings), tab == ScreenId::Settings, [] { open(ScreenId::Settings); });
+}
+
+// Player bar (96 px, full width): what's playing | transport + progress | queue, volume.
+void refresh_bar() {
+    auto& s = shell();
+    if (!s.bar || lv_obj_has_flag(s.bar, LV_OBJ_FLAG_HIDDEN)) return;
+    lv_obj_clean(s.bar);
+    s.progress = s.elapsed = nullptr;
+    auto item = s.state.now_playing();
+    const core::PlayerState* p = s.state.selected();
+
+    lv_obj_t* info = kit::row(s.bar, 14);
+    lv_obj_set_width(info, 340);
+    if (item) {
+        kit::art(info, *item, 64, theme::r_art(), theme::side());
+        lv_obj_t* col = kit::column(info, 2);
+        lv_obj_set_flex_grow(col, 1);
+        lv_obj_set_width(col, 1);
+        kit::text(col, item->name, theme::meta(), theme::text());
+        lv_obj_t* sub = kit::row(col, 8);
+        kit::text(sub, kit::subtitle(*item), theme::label(), theme::text2());
+        kit::badge(sub, item->badge_provider());
+        kit::on_click(info, [] { open(ScreenId::NowPlaying); });
+    } else {
+        kit::text(info, tr(i18n::Str::home_nothing_playing), theme::meta(), theme::text3());
+    }
+
+    lv_obj_t* mid = kit::column(s.bar, 4);
     lv_obj_set_flex_grow(mid, 1);
     lv_obj_set_flex_align(mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    const core::PlayerState* p = s.state.selected();
-    bool radio = item->type == core::MediaType::Radio;
-    if (!radio && (!p || p->can_next_previous)) kit::icon_button(mid, icon::prev, [] { send(app::cmd::Previous{}); });
-    kit::play_button(mid, s.state.playing(), [] { send(app::cmd::PlayPause{}); }, 64);
-    if (!radio && (!p || p->can_next_previous)) kit::icon_button(mid, icon::next, [] { send(app::cmd::Next{}); });
+    lv_obj_t* controls = kit::row(mid, 16);
+    bool radio = item && item->type == core::MediaType::Radio;
+    const auto* q = s.state.queue.get();
+    if (!radio) {
+        bool on = q && q->shuffle;
+        kit::icon_button(controls, icon::shuffle, [on] { send(app::cmd::SetShuffle{!on}); }, 48, 22, false,
+                         on ? theme::accent() : theme::text3());
+    }
+    if (!radio && (!p || p->can_next_previous)) kit::icon_button(controls, icon::prev, [] { send(app::cmd::Previous{}); }, 48, 28);
+    kit::play_button(controls, s.state.playing(), [] { send(app::cmd::PlayPause{}); }, 52);
+    if (!radio && (!p || p->can_next_previous)) kit::icon_button(controls, icon::next, [] { send(app::cmd::Next{}); }, 48, 28);
+    if (!radio) {
+        core::RepeatMode mode = q ? q->repeat : core::RepeatMode::Off;
+        core::RepeatMode next = mode == core::RepeatMode::Off ? core::RepeatMode::All : mode == core::RepeatMode::All ? core::RepeatMode::One : core::RepeatMode::Off;
+        kit::icon_button(controls, mode == core::RepeatMode::One ? icon::repeat_one : icon::repeat,
+                         [next] { send(app::cmd::SetRepeat{next}); }, 48, 22, false,
+                         mode == core::RepeatMode::Off ? theme::text3() : theme::accent());
+    }
+    if (item && !radio && item->duration_s) {
+        lv_obj_t* prog = kit::row(mid, 10);
+        lv_obj_set_width(prog, 460);
+        s.elapsed = kit::text(prog, duration(s.state.elapsed_s), theme::label(), theme::text3());
+        s.progress = lv_bar_create(prog);
+        lv_obj_set_flex_grow(s.progress, 1);
+        lv_obj_set_height(s.progress, 4);
+        lv_obj_set_style_bg_color(s.progress, theme::elevated(), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(s.progress, theme::text(), LV_PART_INDICATOR);
+        lv_obj_set_style_anim_duration(s.progress, 1000, 0);  // glides between the 1 Hz ticks
+        lv_bar_set_range(s.progress, 0, static_cast<int32_t>(item->duration_s));
+        lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_OFF);
+        kit::text(prog, duration(item->duration_s), theme::label(), theme::text3());
+    }
 
-    lv_obj_t* right = kit::row(s.mini, 8);
-    lv_obj_set_width(right, 400);
+    lv_obj_t* right = kit::row(s.bar, 10);
+    lv_obj_set_width(right, 340);
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    speaker_chip(right);
-    kit::icon_button(right, icon::volume, [] { open_volume(); });
-    kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); });
+    kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); }, 48, 22, false, theme::text2());
+    kit::icon_button(right, icon::volume, [] { open_volume(); }, 48, 22, false, theme::text2());
+    if (p && p->can_set_volume) {
+        std::string id = p->player_id;
+        lv_obj_t* vol = kit::slider(right, p->volume_level, [id](int v) { send(app::cmd::SetVolume{id, v}); }, theme::text2());
+        lv_obj_set_width(vol, 140);
+    }
 }
 
 bool in_setup() {
@@ -240,9 +314,8 @@ void tick_progress(lv_timer_t*) {
     if (!s.state.playing()) return;
     ++s.state.elapsed_s;
     screen(s.current).refresh(Topic::Progress);
-    // Mini-player: only the bar moves.
-    if (!lv_obj_has_flag(s.mini, LV_OBJ_FLAG_HIDDEN) && lv_obj_get_child_count(s.mini) > 0)
-        lv_bar_set_value(lv_obj_get_child(s.mini, 0), static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_OFF);
+    if (s.progress) lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_ON);
+    if (s.elapsed) lv_label_set_text(s.elapsed, duration(s.state.elapsed_s).c_str());
 }
 
 }  // namespace
@@ -327,7 +400,7 @@ lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
     lv_obj_t* c = kit::column(parent, 12);
     lv_obj_set_width(c, lv_pct(100));
     lv_obj_set_style_pad_all(c, 24, 0);
-    lv_obj_set_style_radius(c, theme::kRadiusCard, 0);
+    lv_obj_set_style_radius(c, theme::r_card(), 0);
     lv_obj_set_style_border_width(c, 1, 0);
     lv_obj_set_style_border_color(c, theme::hairline(), 0);
     if (!title.empty()) kit::overline(c, title);
@@ -359,7 +432,7 @@ lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& 
     lv_obj_t* b = kit::row(parent, 20);
     lv_obj_set_width(b, lv_pct(100));
     lv_obj_set_style_pad_all(b, 20, 0);
-    lv_obj_set_style_radius(b, theme::kRadiusCard, 0);
+    lv_obj_set_style_radius(b, theme::r_card(), 0);
     lv_obj_set_style_bg_color(b, lv_color_hex(0x2A2416), 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(b, 1, 0);
@@ -489,7 +562,13 @@ void apply(app::Update update) {
         if (!setting_up && s.current == ScreenId::Setup) return open(s.state.connected() ? ScreenId::Home : ScreenId::Boot);
         topic = Topic::Setup;
     } else if (auto* pv = std::get_if<std::shared_ptr<const app::PanelView>>(&update)) {
+        bool restyle = !(theme::appearance() == (*pv)->appearance);
         s.state.panel = *pv;
+        if (restyle) {  // dark/light, accent or rounding changed: rebuild everything in the new look
+            theme::apply((*pv)->appearance);
+            build_all();
+            show(s.current);
+        }
         if (!(*pv)->server_address.empty()) art::set_base("http://" + (*pv)->server_address);
         apply_diagnostics();
         topic = Topic::Panel;
@@ -519,7 +598,10 @@ void apply(app::Update update) {
         return;
     }
     screen(s.current).refresh(topic);
-    if (topic == Topic::Queue || topic == Topic::Players) refresh_mini();
+    if (topic == Topic::Queue || topic == Topic::Players || topic == Topic::Playlists) {
+        build_sidebar();
+        refresh_bar();
+    }
 }
 
 }  // namespace ui

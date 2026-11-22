@@ -438,6 +438,9 @@ static void test_panel_brightness() {
     a.handle(app::cmd::SetDimmed{false});
     a.handle(app::cmd::SetDisplay{d});
     CHECK(platform.brightness == 5);
+    app::Appearance look{app::ThemeMode::Light, 3, app::Roundness::Round};
+    a.handle(app::cmd::SetAppearance{look});
+    CHECK(settings.get("theme") == "light" && settings.get("accent") == "3" && settings.get("round") == "2");
     a.handle(app::cmd::ResetPanel{});
     CHECK(platform.restarted && settings.get("brightness").empty());
 }
@@ -455,6 +458,8 @@ static void test_artwork() {
     auto r = img::scale(red.data(), 4, 4, 16, 16, 6, 0x000000);
     CHECK(r->rgb565[0] == 0 && r->rgb565[15] == 0 && r->rgb565[8 * 16 + 8] == 0xF800);
     // Art background: bright saturated red → dark, muted red within L ≤ 16 %, S ≤ 45 %.
+    uint32_t pale = img::art_background_light(0xFF0000);
+    CHECK((pale >> 16 & 0xFF) >= 0xE5 && (pale & 0xFF) >= 0xD8 && (pale >> 16 & 0xFF) > (pale & 0xFF));  // pale, still reddish
     uint32_t dark = img::art_background(0xFF0000);
     CHECK((dark >> 16 & 0xFF) > (dark & 0xFF) && (dark >> 16 & 0xFF) <= 0x3B && img::art_background(0x101010) == 0x101010);
     // LRU: over budget evicts the oldest unpinned entry.

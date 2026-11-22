@@ -11,27 +11,27 @@ class Search : public Screen {
 public:
     void build(lv_obj_t* root) override {
         lv_obj_set_style_pad_hor(root, theme::kPad, 0);
-        lv_obj_set_style_pad_top(root, 24, 0);
-        lv_obj_set_style_pad_row(root, 16, 0);
+        lv_obj_set_style_pad_top(root, 20, 0);
+        lv_obj_set_style_pad_row(root, 8, 0);
 
         lv_obj_t* field = kit::row(root, 16);
-        lv_obj_set_size(field, lv_pct(100), 64);
-        lv_obj_set_style_radius(field, theme::kRadiusControl, 0);
+        lv_obj_set_size(field, lv_pct(100), 52);
+        lv_obj_set_style_radius(field, theme::r_control(), 0);
         lv_obj_set_style_pad_left(field, 20, 0);
         lv_obj_set_style_pad_right(field, 8, 0);
-        lv_obj_set_style_bg_color(field, theme::surface(), 0);
+        lv_obj_set_style_bg_color(field, theme::field_bg(), 0);
         lv_obj_set_style_bg_opa(field, LV_OPA_COVER, 0);
-        lv_obj_set_style_border_width(field, 1, 0);
+        lv_obj_set_style_border_width(field, theme::light() ? 1 : 0, 0);
         lv_obj_set_style_border_color(field, theme::border(), 0);
-        kit::icon(field, icon::search, 28, theme::text2());
+        kit::icon(field, icon::search, 22, lv_color_hex(0x666666));
         input_ = lv_textarea_create(field);
         lv_obj_remove_style_all(input_);
         lv_textarea_set_one_line(input_, true);
         lv_textarea_set_placeholder_text(input_, tr(i18n::Str::search_placeholder));
         lv_obj_set_flex_grow(input_, 1);
-        lv_obj_set_style_text_font(input_, theme::h2(), 0);
-        lv_obj_set_style_text_color(input_, theme::text(), 0);
-        lv_obj_set_style_text_color(input_, theme::text3(), LV_PART_TEXTAREA_PLACEHOLDER);
+        lv_obj_set_style_text_font(input_, theme::body(), 0);
+        lv_obj_set_style_text_color(input_, theme::field_text(), 0);
+        lv_obj_set_style_text_color(input_, lv_color_hex(0x6B6B6B), LV_PART_TEXTAREA_PLACEHOLDER);
         lv_obj_set_style_border_width(input_, 2, LV_PART_CURSOR | LV_STATE_FOCUSED);
         lv_obj_set_style_border_side(input_, LV_BORDER_SIDE_LEFT, LV_PART_CURSOR | LV_STATE_FOCUSED);
         lv_obj_set_style_border_color(input_, theme::accent(), LV_PART_CURSOR | LV_STATE_FOCUSED);
@@ -44,11 +44,11 @@ public:
         kit::icon_button(field, icon::close, [this] {
             lv_textarea_set_text(input_, "");
             show_keyboard(true);
-        }, 48, 22);
+        }, 44, 22, false, lv_color_hex(0x666666));
 
         chips_ = kit::row(root, 12);
-        status_ = kit::text(root, "", theme::meta(), theme::text2());
-        results_ = kit::scroll_column(root, 28);
+        status_ = kit::text(root, "", theme::label(), theme::text2());
+        results_ = kit::scroll_column(root, 18);
         lv_obj_set_width(results_, lv_pct(100));
         lv_obj_set_flex_grow(results_, 1);
         lv_obj_set_style_pad_bottom(results_, 24, 0);
@@ -71,7 +71,7 @@ private:
         kb_ = kit::keyboard(root, input_, tr(i18n::Str::key_delete), tr(i18n::Str::key_search), tr(i18n::Str::key_space),
                             [this] { show_keyboard(false); });
         lv_obj_add_flag(kb_, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_obj_set_width(kb_, theme::kScreenW - theme::kRailW);
+        lv_obj_set_width(kb_, theme::kScreenW - theme::kSideW);
         lv_obj_align(kb_, LV_ALIGN_BOTTOM_MID, 0, 0);
         show_keyboard(false);
     }
@@ -103,7 +103,7 @@ private:
         }
     }
 
-    void section(const char* title) { kit::text(results_, title, theme::h2(), theme::text()); }
+    void section(const char* title) { kit::text(results_, title, theme::lead(), theme::text()); }
 
     void track_rows(lv_obj_t* parent, const std::vector<core::MediaItem>& tracks, size_t max) {
         for (size_t i = 0; i < tracks.size() && i < max; ++i) {
@@ -116,7 +116,7 @@ private:
     }
 
     void card_row(const std::vector<core::MediaItem>& items, size_t max, bool wrap) {
-        lv_obj_t* r = kit::row(results_, 24);
+        lv_obj_t* r = kit::row(results_, 16);
         lv_obj_set_width(r, lv_pct(100));
         if (wrap) {
             lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW_WRAP);
@@ -125,7 +125,7 @@ private:
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         for (size_t i = 0; i < items.size() && i < max; ++i) {
             const auto& it = items[i];
-            kit::media_card(r, it, kit::subtitle(it), [it] { open_item(it); });
+            kit::media_card(r, it, kit::subtitle(it), [it] { open_item(it); }, it.type == core::MediaType::Artist ? 96 : 112);
         }
     }
 
@@ -174,30 +174,38 @@ private:
         lv_obj_set_width(top, lv_pct(100));
         lv_obj_set_flex_align(top, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         if (r.top) {
-            lv_obj_t* tc = kit::column(top, 16);
-            lv_obj_set_width(tc, 380);
-            kit::text(tc, tr(i18n::Str::search_top_result), theme::h2(), theme::text());
-            lv_obj_t* card = kit::column(tc, 20);
-            lv_obj_set_size(card, 380, 300);
-            lv_obj_set_style_pad_all(card, 28, 0);
-            lv_obj_set_style_radius(card, theme::kRadiusCard, 0);
+            lv_obj_t* tc = kit::column(top, 8);
+            lv_obj_set_width(tc, 248);
+            kit::text(tc, tr(i18n::Str::search_top_result), theme::lead(), theme::text());
+            lv_obj_t* card = kit::column(tc, 12);
+            lv_obj_set_width(card, 248);
+            lv_obj_set_style_pad_all(card, 16, 0);
+            lv_obj_set_style_radius(card, theme::r_card(), 0);
             lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color(card, theme::surface(), 0);
-            lv_obj_set_style_bg_color(card, theme::elevated(), LV_STATE_PRESSED);
-            kit::art(card, *r.top, 132, theme::kRadiusArt, theme::surface());
-            lv_obj_t* name = kit::text(card, r.top->name, theme::h1(), theme::text());
+            lv_color_t tint = theme::art_tint(theme::art_colour(r.top->uri.c_str()));
+            lv_color_t card_bg = theme::light() ? lv_color_mix(lv_color_black(), tint, 12) : lv_color_mix(lv_color_white(), tint, 20);
+            lv_obj_set_style_bg_color(card, card_bg, 0);
+            kit::art(card, *r.top, 88, r.top->type == core::MediaType::Artist ? 44 : theme::r_art(), card_bg);
+            lv_obj_t* name = kit::text(card, r.top->name, theme::h2(), theme::text());
             lv_obj_set_width(name, lv_pct(100));
-            kit::text(card, kit::subtitle(*r.top), theme::body(), theme::text2());
+            lv_obj_t* sub = kit::row(card, 6);
+            kit::text(sub, kit::subtitle(*r.top), theme::label(), theme::text2());
+            kit::badge(sub, r.top->badge_provider());
+            lv_obj_t* pb = kit::play_button(card, false, [] {}, 52);
+            lv_obj_add_flag(pb, LV_OBJ_FLAG_IGNORE_LAYOUT);
+            lv_obj_align(pb, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
             auto t = *r.top;
+            kit::on_click(pb, [t] { play(t); });
+            kit::press_scale(card);
             kit::on_click(card, [t] { open_item(t); });
         }
         if (!r.tracks.empty()) {
             lv_obj_t* tracks = kit::column(top, 8);
             lv_obj_set_flex_grow(tracks, 1);
-            kit::text(tracks, tr(i18n::Str::filter_tracks), theme::h2(), theme::text());
+            kit::text(tracks, tr(i18n::Str::filter_tracks), theme::lead(), theme::text());
             lv_obj_t* list = kit::column(tracks, 0);
             lv_obj_set_width(list, lv_pct(100));
-            track_rows(list, r.tracks, 4);
+            track_rows(list, r.tracks, 5);
         }
         std::vector<core::MediaItem> albums_playlists = r.albums;
         albums_playlists.insert(albums_playlists.end(), r.playlists.begin(), r.playlists.end());

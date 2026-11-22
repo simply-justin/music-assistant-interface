@@ -16,7 +16,9 @@ std::string proxy_url(const std::string& base, const core::Image& image, int px)
     return base + "/imageproxy/" + image.proxy_id + "?size=" + std::to_string(proxy_size(px));
 }
 
-uint32_t art_background(uint32_t rgb) {
+namespace {
+// HSL clamp: saturation ≤ max_s, lightness kept within [min_l, max_l].
+uint32_t clamp_hsl(uint32_t rgb, float max_s, float min_l, float max_l) {
     float r = (rgb >> 16 & 0xFF) / 255.f, g = (rgb >> 8 & 0xFF) / 255.f, b = (rgb & 0xFF) / 255.f;
     float mx = std::max({r, g, b}), mn = std::min({r, g, b});
     float l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
@@ -25,8 +27,8 @@ uint32_t art_background(uint32_t rgb) {
         h = mx == r ? std::fmod((g - b) / d, 6.f) : mx == g ? (b - r) / d + 2 : (r - g) / d + 4;
         h = h * 60 < 0 ? h * 60 + 360 : h * 60;
     }
-    s = std::min(s, 0.45f);
-    l = std::min(l, 0.16f);
+    s = std::min(s, max_s);
+    l = std::clamp(l, min_l, max_l);
     float c = (1 - std::abs(2 * l - 1)) * s, x = c * (1 - std::abs(std::fmod(h / 60, 2.f) - 1)), m = l - c / 2;
     float rr = 0, gg = 0, bb = 0;
     if (h < 60) rr = c, gg = x; else if (h < 120) rr = x, gg = c; else if (h < 180) gg = c, bb = x;
@@ -34,6 +36,10 @@ uint32_t art_background(uint32_t rgb) {
     auto byte = [](float v) { return static_cast<uint32_t>(std::lround(std::clamp(v, 0.f, 1.f) * 255)); };
     return byte(rr + m) << 16 | byte(gg + m) << 8 | byte(bb + m);
 }
+}  // namespace
+
+uint32_t art_background(uint32_t rgb) { return clamp_hsl(rgb, 0.45f, 0.f, 0.16f); }
+uint32_t art_background_light(uint32_t rgb) { return clamp_hsl(rgb, 0.35f, 0.90f, 1.f); }
 
 namespace {
 uint16_t to565(uint32_t r, uint32_t g, uint32_t b) {
@@ -65,6 +71,7 @@ std::shared_ptr<Bitmap> scale(const uint8_t* src, int sw, int sh, int w, int h, 
     // Pre-rounded corners: pixels outside the corner circles take the background colour.
     if (radius > 0) {
         if (bg == kBgFromArt) bg = art_background(out->average);
+        else if (bg == kBgFromArtLight) bg = art_background_light(out->average);
         uint16_t b = to565(bg >> 16 & 0xFF, bg >> 8 & 0xFF, bg & 0xFF);
         int r = std::min({radius, w / 2, h / 2});
         for (int y = 0; y < r; ++y) {

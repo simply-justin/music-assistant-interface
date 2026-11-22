@@ -39,7 +39,7 @@ public:
     }
 
     bool full_screen() const override { return true; }
-    bool mini_player() const override { return false; }
+    bool player_bar() const override { return false; }
     ScreenId tab() const override { return ScreenId::Home; }
     std::string title() const override { return tr(i18n::Str::setup_title); }
 
@@ -83,7 +83,7 @@ private:
         lv_textarea_set_password_mode(input_, password);
         lv_textarea_set_placeholder_text(input_, placeholder.c_str());
         lv_obj_set_size(input_, lv_pct(100), 64);
-        lv_obj_set_style_radius(input_, theme::kRadiusControl, 0);
+        lv_obj_set_style_radius(input_, theme::r_control(), 0);
         lv_obj_set_style_bg_color(input_, theme::surface(), 0);
         lv_obj_set_style_border_width(input_, 2, 0);
         lv_obj_set_style_border_color(input_, theme::border(), 0);
@@ -188,7 +188,7 @@ private:
         if (!v.pairing_url.empty() && !typing_) {
             lv_obj_t* qr_box = kit::column(body);
             lv_obj_set_style_pad_all(qr_box, 16, 0);
-            lv_obj_set_style_radius(qr_box, theme::kRadiusCard, 0);
+            lv_obj_set_style_radius(qr_box, theme::r_card(), 0);
             lv_obj_set_style_bg_color(qr_box, lv_color_white(), 0);
             lv_obj_set_style_bg_opa(qr_box, LV_OPA_COVER, 0);
 #if LV_USE_QRCODE

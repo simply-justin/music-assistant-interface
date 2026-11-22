@@ -39,6 +39,12 @@ lv_obj_t* play_button(lv_obj_t* parent, bool playing, Action action, int32_t siz
 lv_obj_t* chip(lv_obj_t* parent, const char* glyph, const std::string& label, bool selected, Action action);
 // Tab / filter: plain text, the selected one white with an accent underline.
 lv_obj_t* tab(lv_obj_t* parent, const std::string& label, bool selected, Action action);
+// Small filter pill (Home: All / Music / Radio): 32 px visible, 56 px tap area.
+lv_obj_t* pill(lv_obj_t* parent, const std::string& label, bool selected, Action action);
+// Now-playing indicator: three bars, animated while `playing`.
+lv_obj_t* equalizer(lv_obj_t* parent, lv_color_t colour, bool playing);
+// Micro-animation: shrink slightly while pressed (tiles, cards, buttons).
+void press_scale(lv_obj_t* obj);
 lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action);
 
 // Artwork box: placeholder colour (+ type icon for radio) until the real image arrives.
@@ -55,14 +61,14 @@ lv_obj_t* virtual_list(lv_obj_t* parent, size_t count, int32_t row_height, int32
                        std::function<lv_obj_t*(lv_obj_t* list, size_t index)> make);
 
 struct RowOptions {
-    int32_t height = 72;
+    int32_t height = 56;
     bool playing = false;
     bool show_duration = true;
     Action on_tap, on_more, on_remove;
 };
 lv_obj_t* media_row(lv_obj_t* parent, const core::MediaItem& item, const RowOptions& opt);
 lv_obj_t* media_card(lv_obj_t* parent, const core::MediaItem& item, const std::string& sub, Action on_tap,
-                     int32_t size = 160);
+                     int32_t size = 144);
 lv_obj_t* favourite_tile(lv_obj_t* parent, const core::MediaItem& item, Action on_tap, Action on_long_press);
 
 // Slider: 8 px track, 36 px thumb, 56 px hit area. `on_release` fires once when the finger lifts.
