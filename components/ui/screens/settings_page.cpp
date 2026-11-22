@@ -39,7 +39,7 @@ public:
         lv_obj_t* body = kit::scroll_column(root_, 24);
         lv_obj_set_width(body, lv_pct(100));
         lv_obj_set_flex_grow(body, 1);
-        lv_obj_set_style_pad_bottom(body, 24, 0);
+        lv_obj_set_style_pad_bottom(body, 40, 0);  // last item clear of the player bar edge
         switch (settings_page()) {
             case SettingsPage::Display: display(body); break;
             case SettingsPage::Wifi: wifi(body); break;
@@ -324,7 +324,8 @@ private:
         }
         kit::text(accent, tr(i18n::Str::appearance_accent_hint), theme::label(), theme::text3(), true);
 
-        lv_obj_t* round = card(body, tr(i18n::Str::appearance_rounding));
+        lv_obj_t* cols2 = two_columns(body);
+        lv_obj_t* round = half(cols2, tr(i18n::Str::appearance_rounding));
         lv_obj_t* rounds = kit::row(round, 16);
         static const i18n::Str names[] = {i18n::Str::round_sharp, i18n::Str::round_normal, i18n::Str::round_round};
         static const int32_t sample[] = {3, 10, 22};
@@ -338,7 +339,11 @@ private:
             lv_obj_set_style_radius(shape, sample[r], 0);
             lv_obj_set_style_bg_color(shape, theme::elevated(), 0);
             lv_obj_set_style_bg_opa(shape, LV_OPA_COVER, 0);
+            lv_obj_set_size(shape, 96, 64);
         }
+        lv_obj_t* motion = half(cols2, tr(i18n::Str::appearance_motion));
+        toggle_row(motion, tr(i18n::Str::appearance_reduce_motion), tr(i18n::Str::appearance_reduce_motion_sub), a.reduce_motion,
+                   [a, set](bool on) { auto x = a; x.reduce_motion = on; set(x); });
     }
 
     void about(lv_obj_t* body) {

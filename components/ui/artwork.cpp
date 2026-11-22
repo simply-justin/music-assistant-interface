@@ -39,7 +39,7 @@ void show(lv_obj_t* box, const std::string& key, std::shared_ptr<img::Bitmap> bm
     lv_obj_t* image = lv_image_create(box);
     lv_image_set_src(image, &s->dsc);
     lv_obj_center(image);
-    lv_obj_fade_in(image, 150, 0);  // micro-animation: opacity on this one image only, not its container
+    if (theme::motion()) lv_obj_fade_in(image, 150, 0);  // micro-animation: opacity on this one image only, not its container
     art_state().cache.pin(key);
     lv_obj_add_event_cb(image, [](lv_event_t* e) {
         auto* s = static_cast<Shown*>(lv_event_get_user_data(e));

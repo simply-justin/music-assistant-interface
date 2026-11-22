@@ -31,7 +31,10 @@ struct Appearance {
     ThemeMode mode = ThemeMode::Dark;
     uint8_t accent = 0;
     Roundness roundness = Roundness::Normal;
-    bool operator==(const Appearance& o) const { return mode == o.mode && accent == o.accent && roundness == o.roundness; }
+    bool reduce_motion = false;  // WCAG 2.2.2 / 2.3.3: no equalizer, press or fade animations
+    bool operator==(const Appearance& o) const {
+        return mode == o.mode && accent == o.accent && roundness == o.roundness && reduce_motion == o.reduce_motion;
+    }
 };
 
 enum class SetupStep : uint8_t { Welcome, Wifi, WifiPassword, Server, SignIn, Speaker, Done, Finished };

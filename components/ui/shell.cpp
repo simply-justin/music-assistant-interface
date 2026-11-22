@@ -169,6 +169,7 @@ void build_sidebar() {
             if (++n > 6) break;
             lv_obj_t* r = kit::row(s.side, 12);
             lv_obj_set_size(r, lv_pct(100), 44);
+            lv_obj_set_ext_click_area(r, 6);  // 56 px tap target
             lv_obj_set_style_pad_hor(r, 6, 0);
             lv_obj_set_style_radius(r, theme::r_control(), 0);
             lv_obj_set_style_bg_color(r, theme::surface(), LV_STATE_PRESSED);
@@ -214,6 +215,7 @@ void refresh_bar() {
     lv_obj_set_flex_grow(mid, 1);
     lv_obj_set_flex_align(mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_t* controls = kit::row(mid, 16);
+    if (!item) lv_obj_add_flag(mid, LV_OBJ_FLAG_HIDDEN);  // nothing playing: no controls that do nothing
     bool radio = item && item->type == core::MediaType::Radio;
     const auto* q = s.state.queue.get();
     if (!radio) {
@@ -248,6 +250,7 @@ void refresh_bar() {
 
     lv_obj_t* right = kit::row(s.bar, 10);
     lv_obj_set_width(right, 340);
+    lv_obj_set_style_pad_right(right, 12, 0);  // room for the volume knob at 100 %
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); }, 48, 22, false, theme::text2());
     kit::icon_button(right, icon::volume, [] { open_volume(); }, 48, 22, false, theme::text2());

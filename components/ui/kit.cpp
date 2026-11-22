@@ -27,6 +27,7 @@ void pressable(lv_obj_t* o, lv_color_t base, bool light = false) {
 // Micro-animation: shrink to 96 % while pressed, 120 ms. Used on tiles, cards and buttons only
 // (a transform renders the object as a layer: keep it to small, leaf-like objects).
 void shrink_on_press(lv_obj_t* o) {
+    if (!theme::motion()) return;
     static lv_style_t style;
     static lv_style_transition_dsc_t trans;
     static bool ready = false;
@@ -184,6 +185,8 @@ lv_obj_t* text(lv_obj_t* parent, const std::string& s, const lv_font_t* font, lv
     lv_obj_set_style_text_color(l, colour, 0);
     if (!wrap) {
         lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
+        // One line: a fixed line height makes LONG_DOT cut with "…" instead of wrapping.
+        lv_obj_set_height(l, lv_font_get_line_height(font));
         // Clip to the parent only when the parent has a real width; in a content-sized parent
         // (a chip) "100 %" would resolve to 0 and hide the text.
         if (lv_obj_get_style_width(parent, LV_PART_MAIN) != LV_SIZE_CONTENT) lv_obj_set_style_max_width(l, lv_pct(100), 0);
@@ -248,6 +251,7 @@ lv_obj_t* icon_button(lv_obj_t* parent, const char* glyph, Action action, int32_
     lv_obj_t* b = lv_obj_create(parent);
     remove_style(b);
     lv_obj_set_size(b, size, size);
+    if (size < theme::kMinTap) lv_obj_set_ext_click_area(b, (theme::kMinTap - size) / 2);
     lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
     pressable(b, theme::elevated());
     lv_obj_set_style_bg_opa(b, LV_OPA_TRANSP, 0);
@@ -300,15 +304,34 @@ lv_obj_t* tab(lv_obj_t* parent, const std::string& label, bool selected, Action 
     return t;
 }
 
+lv_obj_t* section_header(lv_obj_t* parent, const std::string& title, const std::string& link, Action on_link) {
+    lv_obj_t* h = row(parent, 12);
+    lv_obj_set_size(h, lv_pct(100), 40);
+    lv_obj_t* t = text(h, title, theme::h2(), theme::text());
+    lv_obj_set_flex_grow(t, 1);
+    if (!link.empty()) {
+        lv_obj_t* l = row(h);
+        lv_obj_set_height(l, 40);
+        lv_obj_set_ext_click_area(l, 8);
+        lv_obj_set_style_pad_hor(l, 8, 0);
+        lv_obj_set_style_radius(l, theme::r_control(), 0);
+        lv_obj_set_style_bg_color(l, theme::surface(), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(l, LV_OPA_COVER, LV_STATE_PRESSED);
+        text(l, link, theme::meta(), theme::text2());
+        on_click(l, std::move(on_link));
+    }
+    return h;
+}
+
 lv_obj_t* pill(lv_obj_t* parent, const std::string& label, bool selected, Action action) {
     lv_obj_t* p = row(parent);
-    lv_obj_set_height(p, 32);
-    lv_obj_set_ext_click_area(p, 12);  // 56 px tap target
-    lv_obj_set_style_pad_hor(p, 14, 0);
+    lv_obj_set_height(p, 40);
+    lv_obj_set_ext_click_area(p, 8);  // 56 px tap target
+    lv_obj_set_style_pad_hor(p, 18, 0);
     lv_obj_set_style_radius(p, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(p, LV_OPA_COVER, 0);
     pressable(p, selected ? theme::accent() : theme::surface(), selected);
-    text(p, label, theme::label(), selected ? theme::on_accent() : theme::text());
+    text(p, label, theme::meta(), selected ? theme::on_accent() : theme::text());
     on_click(p, std::move(action));
     return p;
 }
@@ -377,7 +400,7 @@ lv_obj_t* equalizer(lv_obj_t* parent, lv_color_t colour, bool playing) {
         lv_obj_set_style_radius(bar, 1, 0);
         lv_obj_set_style_bg_color(bar, colour, 0);
         lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
-        if (!playing) continue;
+        if (!playing || !theme::motion()) continue;
         // Micro-animation: tiny area, so cheap; deleted with the bar.
         lv_anim_t a;
         lv_anim_init(&a);
@@ -445,20 +468,23 @@ lv_obj_t* media_row(lv_obj_t* parent, const core::MediaItem& item, const RowOpti
         lv_obj_set_width(d, 48);
         lv_obj_set_style_text_align(d, LV_TEXT_ALIGN_RIGHT, 0);
     }
-    if (opt.on_more) icon_button(r, icon::more, opt.on_more, 48, 22, false, theme::text2());
+    if (opt.on_more) icon_button(r, icon::more, opt.on_more, 48, 22, false, theme::text2());  // 56 px tap area
     if (opt.on_remove) icon_button(r, icon::close, opt.on_remove, 48, 22, false, theme::text2());
     on_click(r, opt.on_tap);
     return r;
 }
 
 lv_obj_t* media_card(lv_obj_t* parent, const core::MediaItem& item, const std::string& sub, Action on_tap, int32_t size) {
+    bool round = item.type == core::MediaType::Artist || item.type == core::MediaType::Radio;
+    // Round items (artists, stations) get a label wider than the circle so names fit.
+    int32_t label_w = round ? size + 32 : size;
     lv_obj_t* c = column(parent, 8);
-    lv_obj_set_width(c, size);
-    art(c, item, size, item.type == core::MediaType::Artist || item.type == core::MediaType::Radio ? size / 2 : theme::r_art());
-    lv_obj_t* t = text(c, item.name, theme::meta(), theme::text());
-    lv_obj_set_width(t, size);
-    if (item.type == core::MediaType::Artist || item.type == core::MediaType::Radio)
-        lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(c, label_w);
+    lv_obj_set_flex_align(c, LV_FLEX_ALIGN_START, round ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    art(c, item, size, round ? size / 2 : theme::r_art());
+    lv_obj_t* t = text(c, item.name, round ? theme::label() : theme::meta(), theme::text());
+    lv_obj_set_width(t, label_w);
+    if (round) lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
     if (!sub.empty() && item.type != core::MediaType::Artist && item.type != core::MediaType::Radio) {
         lv_obj_t* s = text(c, sub, theme::label(), theme::text2());
         lv_obj_set_width(s, size);
@@ -514,11 +540,15 @@ lv_obj_t* slider(lv_obj_t* parent, int value, std::function<void(int)> on_releas
 
 lv_obj_t* toggle(lv_obj_t* parent, bool on, std::function<void(bool)> on_change) {
     lv_obj_t* sw = lv_switch_create(parent);
-    lv_obj_set_size(sw, 64, 36);
-    lv_obj_set_ext_click_area(sw, 10);
+    lv_obj_set_size(sw, 60, 34);
+    lv_obj_set_ext_click_area(sw, 11);
     lv_obj_set_style_bg_color(sw, theme::elevated(), LV_PART_MAIN);
+    lv_obj_set_style_border_width(sw, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(sw, theme::border(), LV_PART_MAIN);
     lv_obj_set_style_bg_color(sw, theme::accent(), LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(sw, theme::text(), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(sw, -3, LV_PART_KNOB);
+    lv_obj_set_style_bg_color(sw, theme::text2(), LV_PART_KNOB);  // off: grey knob on a dark track
+    lv_obj_set_style_bg_color(sw, theme::on_accent(), LV_PART_KNOB | LV_STATE_CHECKED);  // on: contrasts with the accent
     if (on) lv_obj_add_state(sw, LV_STATE_CHECKED);
     if (on_change) {
         auto* fn = new std::function<void(bool)>(std::move(on_change));

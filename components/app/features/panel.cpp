@@ -55,6 +55,7 @@ public:
             s.set("theme", a->appearance.mode == ThemeMode::Light ? "light" : "dark");
             s.set("accent", std::to_string(a->appearance.accent));
             s.set("round", std::to_string(static_cast<int>(a->appearance.roundness)));
+            s.set("reduce_motion", a->appearance.reduce_motion ? "1" : "0");
             publish();
         } else if (auto* o = std::get_if<cmd::SetSourceOrder>(&c)) {
             view_.source_order = o->providers;
@@ -93,6 +94,7 @@ private:
         view_.appearance.mode = ctx_.settings.get("theme") == "light" ? ThemeMode::Light : ThemeMode::Dark;
         view_.appearance.accent = static_cast<uint8_t>(num("accent", 0));
         view_.appearance.roundness = static_cast<Roundness>(std::clamp(num("round", 1), 0, 2));
+        view_.appearance.reduce_motion = num("reduce_motion", 0) != 0;
         view_.source_order = ctx_.prefs.provider_order;  // App::start loaded these
     }
 

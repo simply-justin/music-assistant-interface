@@ -183,13 +183,13 @@ private:
             lv_obj_set_style_radius(card, theme::r_card(), 0);
             lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
             lv_color_t tint = theme::art_tint(theme::art_colour(r.top->uri.c_str()));
-            lv_color_t card_bg = theme::light() ? lv_color_mix(lv_color_black(), tint, 12) : lv_color_mix(lv_color_white(), tint, 20);
+            lv_color_t card_bg = theme::light() ? lv_color_mix(lv_color_black(), tint, 12) : lv_color_mix(lv_color_white(), tint, 12);
             lv_obj_set_style_bg_color(card, card_bg, 0);
             kit::art(card, *r.top, 88, r.top->type == core::MediaType::Artist ? 44 : theme::r_art(), card_bg);
             lv_obj_t* name = kit::text(card, r.top->name, theme::h2(), theme::text());
             lv_obj_set_width(name, lv_pct(100));
             lv_obj_t* sub = kit::row(card, 6);
-            kit::text(sub, kit::subtitle(*r.top), theme::label(), theme::text2());
+            kit::text(sub, kit::subtitle(*r.top), theme::label(), theme::text());  // art-tinted card: main colour only
             kit::badge(sub, r.top->badge_provider());
             lv_obj_t* pb = kit::play_button(card, false, [] {}, 52);
             lv_obj_add_flag(pb, LV_OBJ_FLAG_IGNORE_LAYOUT);

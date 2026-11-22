@@ -15,8 +15,8 @@ public:
     void build(lv_obj_t* root) override {
         root_ = root;
         lv_obj_set_style_pad_hor(root, theme::kPad, 0);
-        lv_obj_set_style_pad_top(root, 24, 0);
-        lv_obj_set_style_pad_row(root, 16, 0);
+        lv_obj_set_style_pad_top(root, 20, 0);
+        lv_obj_set_style_pad_row(root, 14, 0);
     }
 
     void on_open() override {
@@ -48,8 +48,8 @@ private:
         band_ = lv_obj_create(root_);
         lv_obj_remove_style_all(band_);
         lv_obj_add_flag(band_, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        lv_obj_set_pos(band_, -theme::kPad, -24);
-        lv_obj_set_size(band_, theme::kScreenW - theme::kSideW, 250);
+        lv_obj_set_pos(band_, -theme::kPad, -20);
+        lv_obj_set_size(band_, theme::kScreenW - theme::kSideW, 20 + 48 + 14 + 120 + 24);  // header + tiles + margin
         lv_obj_set_style_bg_color(band_, now ? theme::art_tint(art) : theme::bg(), 0);
         lv_obj_set_style_bg_opa(band_, LV_OPA_COVER, 0);
 
@@ -61,14 +61,12 @@ private:
 
     void header() {
         lv_obj_t* h = kit::row(root_, 10);
-        lv_obj_set_width(h, lv_pct(100));
+        lv_obj_set_size(h, lv_pct(100), 48);
         std::time_t now = std::time(nullptr);
         int hour = std::localtime(&now)->tm_hour;
         auto greeting = hour < 12 ? i18n::Str::home_morning : hour < 18 ? i18n::Str::home_afternoon : i18n::Str::home_evening;
         lv_obj_t* g = kit::text(h, tr(greeting), theme::h1(), theme::text());
-        lv_obj_set_flex_grow(g, 1);
-        if (state().ever_connected && !state().connected())
-            kit::text(h, tr(i18n::Str::home_reconnecting), theme::meta(), theme::warning());
+        lv_obj_set_style_margin_right(g, 18, 0);
         struct F { Filter f; i18n::Str s; };
         for (F x : {F{Filter::All, i18n::Str::filter_all}, F{Filter::Music, i18n::Str::home_music}, F{Filter::Radio, i18n::Str::filter_radio}}) {
             Filter f = x.f;
@@ -77,17 +75,20 @@ private:
                 kit::later([this] { rebuild(); });
             });
         }
+        kit::spacer(h);
+        if (state().ever_connected && !state().connected())
+            kit::text(h, tr(i18n::Str::home_reconnecting), theme::meta(), theme::warning());
     }
 
     // 4 × 2 one-tap favourites; long-press opens the preview.
     void shortcuts() {
         lv_obj_t* grid = lv_obj_create(root_);
         lv_obj_remove_style_all(grid);
-        lv_obj_set_size(grid, lv_pct(100), 64 * 2 + 12);
+        lv_obj_set_size(grid, lv_pct(100), 56 * 2 + 8);
         static const int32_t cols[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-        static const int32_t rows[] = {64, 64, LV_GRID_TEMPLATE_LAST};
+        static const int32_t rows[] = {56, 56, LV_GRID_TEMPLATE_LAST};
         lv_obj_set_grid_dsc_array(grid, cols, rows);
-        lv_obj_set_style_pad_row(grid, 12, 0);
+        lv_obj_set_style_pad_row(grid, 8, 0);
         lv_obj_set_style_pad_column(grid, 12, 0);
         const auto* favs = state().list(Kind::Favourites);
         int n = 0;
@@ -108,39 +109,41 @@ private:
     void middle(const std::optional<core::MediaItem>& now) {
         lv_obj_t* r = kit::row(root_, 28);
         lv_obj_set_width(r, lv_pct(100));
-        lv_obj_set_style_margin_top(r, 8, 0);
+        lv_obj_set_style_margin_top(r, 6, 0);
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
         // "Now on <speaker>": a card in the artwork's colour.
-        lv_obj_t* left = kit::column(r, 10);
+        lv_obj_t* left = kit::column(r, 8);
+        lv_obj_set_width(left, 304);
         const core::PlayerState* p = state().selected();
-        kit::text(left, i18n::tr(i18n::Str::home_now_on, p ? p->name : ""), theme::h2(), theme::text());
+        kit::section_header(left, i18n::tr(i18n::Str::home_now_on, p ? p->name : ""));
         lv_obj_t* card = kit::column(left, 0);
-        lv_obj_set_size(card, 304, 196);
-        lv_obj_set_style_pad_all(card, 18, 0);
+        lv_obj_set_size(card, 304, 180);
+        lv_obj_set_style_pad_all(card, 16, 0);
         lv_obj_set_style_radius(card, theme::r_card(), 0);
         lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
         lv_color_t tint = now ? theme::art_tint(theme::art_colour(now->uri.c_str())) : theme::surface();
-        lv_color_t card_bg = theme::light() ? lv_color_mix(lv_color_black(), tint, 12) : lv_color_mix(lv_color_white(), tint, 20);
+        lv_color_t card_bg = theme::light() ? lv_color_mix(lv_color_black(), tint, 12) : lv_color_mix(lv_color_white(), tint, 12);
         lv_obj_set_style_bg_color(card, card_bg, 0);
         lv_obj_set_flex_align(card, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         kit::press_scale(card);
         kit::on_click(card, [] { open(ScreenId::NowPlaying); });
         if (!now) {
             kit::text(card, tr(i18n::Str::home_nothing_playing), theme::body(), theme::text());
-            kit::text(card, tr(i18n::Str::home_pick_favourite), theme::meta(), theme::text2(), true);
+            kit::text(card, tr(i18n::Str::home_pick_favourite), theme::meta(), theme::text(), true);
         } else {
             lv_obj_t* top = kit::row(card, 14);
             lv_obj_set_width(top, lv_pct(100));
-            kit::art(top, *now, 88, theme::r_art(), card_bg);
+            kit::art(top, *now, 80, theme::r_art(), card_bg);
             lv_obj_t* info = kit::column(top, 4);
             lv_obj_set_flex_grow(info, 1);
             lv_obj_set_width(info, 1);
             lv_obj_t* ov = kit::row(info, 8);
             if (state().playing()) kit::equalizer(ov, theme::text(), true);
-            kit::overline(ov, tr(state().playing() ? i18n::Str::home_now_playing : i18n::Str::home_paused), theme::text2());
+            // Only the main text colour on art-tinted cards: grey can drop below 4.5:1 there.
+            kit::overline(ov, tr(state().playing() ? i18n::Str::home_now_playing : i18n::Str::home_paused), theme::text());
             kit::text(info, now->name, theme::body(), theme::text());
-            kit::text(info, kit::subtitle(*now), theme::label(), theme::text2());
+            kit::text(info, kit::subtitle(*now), theme::label(), theme::text());
             lv_obj_t* bottom = kit::row(card, 12);
             lv_obj_set_width(bottom, lv_pct(100));
             kit::play_button(bottom, state().playing(), [] { send(app::cmd::PlayPause{}); }, 52);
@@ -158,22 +161,18 @@ private:
         }
 
         // Recently played (or your playlists if nothing was played yet).
-        lv_obj_t* right = kit::column(r, 10);
+        lv_obj_t* right = kit::column(r, 8);
         lv_obj_set_flex_grow(right, 1);
         lv_obj_set_width(right, 1);
-        lv_obj_t* head = kit::row(right);
-        lv_obj_set_width(head, lv_pct(100));
-        lv_obj_t* t = kit::text(head, tr(i18n::Str::home_recently_played), theme::h2(), theme::text());
-        lv_obj_set_flex_grow(t, 1);
-        kit::tab(head, tr(i18n::Str::home_see_all), false, [] { open(ScreenId::Library); });
-        lv_obj_t* cards = kit::row(right, 20);
+        kit::section_header(right, tr(i18n::Str::home_recently_played), tr(i18n::Str::home_see_all), [] { open(ScreenId::Library); });
+        lv_obj_t* cards = kit::row(right, 18);
         lv_obj_set_flex_align(cards, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         std::vector<core::MediaItem> items;
         if (const auto* recent = state().list(Kind::RecentlyPlayed)) items = recent->items;
         if (items.empty() && state().playlists) items = state().playlists->playlists;
         for (size_t i = 0; i < items.size() && i < 4; ++i) {
             const auto& it = items[i];
-            kit::media_card(cards, it, kit::subtitle(it), [it] { open_item(it); }, 144);
+            kit::media_card(cards, it, kit::subtitle(it), [it] { open_item(it); }, 128);
         }
         if (items.empty()) kit::text(cards, tr(i18n::Str::list_empty), theme::meta(), theme::text3());
     }
@@ -187,11 +186,12 @@ private:
         if (filter_ == Filter::Music) return;
         const auto* radio = state().list(Kind::LibraryRadio);
         if (!radio || radio->items.empty()) return;
-        kit::text(root_, tr(i18n::Str::home_stations), theme::h2(), theme::text());
-        lv_obj_t* row = kit::row(root_, 28);
-        for (size_t i = 0; i < radio->items.size() && i < 6; ++i) {
+        kit::section_header(root_, tr(i18n::Str::home_stations), tr(i18n::Str::home_see_all), [] { open(ScreenId::Library); });
+        lv_obj_t* row = kit::row(root_, 12);
+        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+        for (size_t i = 0; i < radio->items.size() && i < 7; ++i) {
             const auto& st = radio->items[i];
-            kit::media_card(row, st, "", [st] { play(st); }, 96);
+            kit::media_card(row, st, "", [st] { play(st); }, 88);
         }
     }
 

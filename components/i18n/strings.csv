@@ -278,3 +278,6 @@ appearance_rounding,Rounding,Afronding
 round_sharp,Sharp,Strak
 round_normal,Normal,Normaal
 round_round,Round,Rond
+appearance_motion,Motion,Beweging
+appearance_reduce_motion,Reduce motion,Minder beweging
+appearance_reduce_motion_sub,"No moving equalizer, press or fade effects","Geen bewegende equalizer, druk- of vervaageffecten"

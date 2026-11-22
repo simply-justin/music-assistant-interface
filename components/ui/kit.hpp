@@ -43,6 +43,8 @@ lv_obj_t* tab(lv_obj_t* parent, const std::string& label, bool selected, Action 
 lv_obj_t* pill(lv_obj_t* parent, const std::string& label, bool selected, Action action);
 // Now-playing indicator: three bars, animated while `playing`.
 lv_obj_t* equalizer(lv_obj_t* parent, lv_color_t colour, bool playing);
+// Section title with an optional link on the right ("See all"), on one baseline.
+lv_obj_t* section_header(lv_obj_t* parent, const std::string& title, const std::string& link = {}, Action on_link = {});
 // Micro-animation: shrink slightly while pressed (tiles, cards, buttons).
 void press_scale(lv_obj_t* obj);
 lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action);

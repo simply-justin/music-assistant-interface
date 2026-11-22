@@ -12,10 +12,10 @@ struct Palette {
 };
 
 // Neutral black/grey with white as the primary (dark), and its light counterpart.
-constexpr Palette kDark{0x0A0A0A, 0x000000, 0x161616, 0x242424, 0x1C1C1C, 0x333333, 0xFFFFFF, 0xA3A3A3, 0x8A8A8A,
+constexpr Palette kDark{0x0A0A0A, 0x000000, 0x161616, 0x242424, 0x1C1C1C, 0x333333, 0xFFFFFF, 0xA3A3A3, 0x8F8F8F,
                         0xFFFFFF, 0x000000, 0xFFFFFF, 0x111111, 0xE7B14C, 0xF08C7E, 0xB3261E, 0xC2410C};
 constexpr Palette kLight{0xF6F6F7, 0xFFFFFF, 0xECECEE, 0xE0E0E4, 0xE4E4E7, 0xCFCFD4, 0x111111, 0x52525B, 0x63636B,
-                         0x111111, 0xFFFFFF, 0xFFFFFF, 0x111111, 0xA15C00, 0xB42318, 0xB3261E, 0xC2410C};
+                         0x111111, 0xFFFFFF, 0xFFFFFF, 0x111111, 0x8A4B00, 0xB42318, 0xB3261E, 0xC2410C};
 
 // Accents: {dark mode, light mode}. Index 0 = neutral (the primary).
 struct Accent {
@@ -43,6 +43,7 @@ void apply(const app::Appearance& a) {
 }
 const app::Appearance& appearance() { return g_look; }
 bool light() { return g_look.mode == app::ThemeMode::Light; }
+bool motion() { return !g_look.reduce_motion; }
 
 lv_color_t bg() { return c(g_p->bg); }
 lv_color_t side() { return c(g_p->side); }

@@ -11,6 +11,7 @@ namespace ui::theme {
 void apply(const app::Appearance& appearance);
 const app::Appearance& appearance();
 bool light();
+bool motion();  // false when the user asked for reduced motion
 
 // Colour
 lv_color_t bg();          // page
@@ -64,7 +65,8 @@ inline const lv_font_t* icons(int size) {
 constexpr int32_t kScreenW = 1280, kScreenH = 800;
 constexpr int32_t kSideW = 216, kBarH = 96, kPad = 32;
 constexpr int32_t kPrimary = 64, kSecondary = 56, kChipH = 56, kGap = 8;
-constexpr int32_t kNavH = 40, kNavHit = 6;  // visible 40 px, +6 px tap area above/below (52)
+constexpr int32_t kNavH = 40, kNavHit = 8;  // visible 40 px, +8 px tap area above/below (56)
+constexpr int32_t kMinTap = 56;             // smallest tap target (spec + WCAG 2.5.8 with margin)
 
 // Placeholder artwork colour (before the real cover is decoded): muted, stable per uri.
 lv_color_t art_colour(const char* key);
