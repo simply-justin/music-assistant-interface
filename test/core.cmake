@@ -35,7 +35,9 @@ set(CORE_SOURCES
     ${ROOT}/components/app/features/favourites.cpp
     ${ROOT}/components/app/features/preferences.cpp
     ${ROOT}/components/app/features/playlists.cpp
-    ${ROOT}/components/app/features/browse.cpp)
+    ${ROOT}/components/app/features/browse.cpp
+    ${ROOT}/components/app/features/setup.cpp
+    ${ROOT}/components/app/features/panel.cpp)
 add_library(panel_core STATIC ${CORE_SOURCES})
 target_include_directories(panel_core PUBLIC
     ${CJSON_DIR}

@@ -14,6 +14,7 @@
 #include "app/app.hpp"
 #include "backend/ma_session.hpp"
 #include "backend/mock_backend.hpp"
+#include "fake_platform.hpp"
 #include "host_ma_backend.hpp"
 
 namespace {
@@ -23,6 +24,7 @@ const char* conn_name(backend::Connection c) {
         case backend::Connection::Disconnected: return "disconnected";
         case backend::Connection::Connecting: return "connecting";
         case backend::Connection::Connected: return "connected";
+        case backend::Connection::AuthRequired: return "needs a token";
         case backend::Connection::AuthFailed: return "token rejected";
         case backend::Connection::IncompatibleServer: return "server too old";
         case backend::Connection::WrongServer: return "different server";
@@ -164,13 +166,19 @@ int main(int argc, char** argv) {
             std::fprintf(stderr, "Need MA_URL and MA_TOKEN (env or a server.env file), or --mock\n");
             return 1;
         }
-        be = std::make_unique<HostMaBackend>(get("MA_URL"), get("MA_TOKEN"));
+        be = std::make_unique<HostMaBackend>("", "");  // App configures it from settings
     }
 
     Cli cli;
     app::MemorySettings settings;
+    if (!mock) {
+        settings.set("server_url", get("MA_URL"));
+        settings.set("token", get("MA_TOKEN"));
+        settings.set("setup_done", "1");
+    }
+    FakePlatform platform;
     std::vector<app::Update> inbox;
-    app::App a(*be, settings, [&](app::Update u) { inbox.push_back(std::move(u)); });
+    app::App a(*be, settings, platform, [&](app::Update u) { inbox.push_back(std::move(u)); });
     a.start();
     std::printf("%s", kHelp);
 
@@ -224,6 +232,7 @@ int main(int argc, char** argv) {
             else if (cmd == "lang") { i18n::Lang l; if (i18n::language_from_code(arg, l)) a.handle(app::cmd::SetLanguage{l}); }
             else if (!cmd.empty()) std::printf("? unknown command, type help\n");
         }
+        platform.tick(host_now_ms());
         a.tick(host_now_ms());
         for (auto& u : inbox) cli.on_update(u);
         inbox.clear();

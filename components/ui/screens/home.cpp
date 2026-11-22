@@ -35,7 +35,7 @@ public:
         }
         if (t == Topic::All || t == Topic::Connection || t == Topic::Players) build_header();
         build_top();
-        if (t != Topic::Queue) build_shelf();
+        if (t != Topic::Queue && t != Topic::Panel) build_shelf();
     }
 
     bool mini_player() const override { return false; }
@@ -125,7 +125,7 @@ private:
         if (favs) {
             for (size_t i = 0; i < favs->items.size() && i < 6; ++i) {
                 const auto& f = favs->items[i];
-                lv_obj_t* t = kit::favourite_tile(grid, f, [f] { play(f); }, [f] { open_track_menu(f); });
+                lv_obj_t* t = kit::favourite_tile(grid, f, [f] { play(f); }, [f] { open_favourite_preview(f); });
                 lv_obj_set_grid_cell(t, LV_GRID_ALIGN_STRETCH, static_cast<int32_t>(i % 2), 1, LV_GRID_ALIGN_STRETCH,
                                      static_cast<int32_t>(i / 2), 1);
             }
@@ -134,6 +134,12 @@ private:
 
     void build_shelf() {
         lv_obj_clean(shelf_);
+        if (state().ever_connected && !state().connected()) {
+            // Offline: the shelf can't load anyway; say what's happening instead.
+            lv_obj_t* b = banner(shelf_, tr(i18n::Str::offline_title), tr(i18n::Str::offline_body));
+            kit::button(b, kit::Button::Secondary, icon::refresh, tr(i18n::Str::offline_retry), [] { send(app::cmd::Reconnect{}); });
+            return;
+        }
         lv_obj_t* head = kit::row(shelf_, 12);
         lv_obj_set_width(head, lv_pct(100));
         kit::chip(head, nullptr, tr(i18n::Str::home_recently_played), !show_playlists_, [this] { show_playlists_ = false; kit::later([this] { build_shelf(); }); });

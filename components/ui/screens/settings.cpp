@@ -1,9 +1,16 @@
-// Settings (first slice): which speaker plays, language, and connection info.
-// Sub-screens (screen & night mode, Wi-Fi, Music Assistant, about) follow in the next slice.
+// Settings: "Play music on" + "This panel" rows leading to the sub-pages (settings_page.cpp).
 #include "../shell.hpp"
 
 namespace ui {
 namespace {
+
+std::string language_label(i18n::Lang lang) {
+    i18n::Lang current = i18n::language();
+    i18n::set_language(lang);
+    std::string name = tr(i18n::Str::language_name_self);  // each language names itself
+    i18n::set_language(current);
+    return name;
+}
 
 class Settings : public Screen {
 public:
@@ -14,7 +21,7 @@ public:
     }
 
     void refresh(Topic t) override {
-        if (t != Topic::All && t != Topic::Players && t != Topic::Connection) return;
+        if (t != Topic::All && t != Topic::Players && t != Topic::Connection && t != Topic::Panel) return;
         lv_obj_clean(root_);
         kit::text(root_, tr(i18n::Str::nav_settings), theme::h1(), theme::text());
         lv_obj_t* cols = kit::row(root_, 24);
@@ -22,66 +29,46 @@ public:
         lv_obj_set_flex_align(cols, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
         lv_obj_t* speakers = card(cols, tr(i18n::Str::settings_play_on));
+        lv_obj_set_flex_grow(speakers, 1);
+        lv_obj_set_width(speakers, 1);
         if (const auto* pv = state().players.get()) {
-            for (const auto& p : pv->players) speaker_row(speakers, p, p.player_id == pv->selected_id);
+            for (const auto& p : pv->players) {
+                bool on = p.player_id == pv->selected_id;
+                std::string id = p.player_id;
+                lv_obj_t* r = nav_row(speakers, icon::speaker, p.name, p.available ? "" : tr(i18n::Str::setup_offline),
+                                      [id] { send(app::cmd::SelectPlayer{id}); }, false);
+                if (on) kit::icon(r, icon::check, 28, theme::accent());
+                else lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
+            }
         }
 
         lv_obj_t* panel = card(cols, tr(i18n::Str::settings_this_panel));
-        kit::overline(panel, tr(i18n::Str::settings_language));
-        lv_obj_t* langs = kit::row(panel, 12);
-        for (int i = 0; i < i18n::kLangCount; ++i) {
-            auto lang = static_cast<i18n::Lang>(i);
-            kit::chip(langs, nullptr, language_label(lang),
-                      i18n::language() == lang, [lang] { send(app::cmd::SetLanguage{lang}); });
+        lv_obj_set_flex_grow(panel, 1);
+        lv_obj_set_width(panel, 1);
+        const app::PanelView* pv = state().panel.get();
+        std::string display_sub;
+        if (pv) {
+            const auto& d = pv->display;
+            display_sub = d.dim_after_s ? i18n::tr(i18n::Str::settings_dims_after, dim_label(d.dim_after_s)) : tr(i18n::Str::dim_never);
+            if (d.night) display_sub += " · " + i18n::tr(i18n::Str::settings_night_range, clock_text(d.night_from) + "–" + clock_text(d.night_to));
         }
-        kit::overline(panel, tr(i18n::Str::settings_server));
-        const auto& c = state().connection;
-        std::string server = c.server.server_version.empty() ? tr(i18n::Str::home_reconnecting)
-                                                             : "Music Assistant " + c.server.server_version;
-        kit::text(panel, server, theme::body(), theme::text());
+        nav_row(panel, icon::sun, tr(i18n::Str::page_display), display_sub, [] { open_settings_page(SettingsPage::Display); });
+        nav_row(panel, icon::wifi, tr(i18n::Str::page_wifi), pv && pv->wifi.connected ? pv->wifi.ssid : tr(i18n::Str::wifi_not_connected),
+                [] { open_settings_page(SettingsPage::Wifi); });
+        std::string server_sub = std::string(tr(state().connected() ? i18n::Str::home_connected : i18n::Str::home_reconnecting)) +
+                                 (pv && !pv->server_address.empty() ? " · " + pv->server_address : "");
+        nav_row(panel, icon::server, tr(i18n::Str::settings_server), server_sub, [] { open_settings_page(SettingsPage::Server); });
+        nav_row(panel, icon::language, tr(i18n::Str::settings_language), language_label(i18n::language()),
+                [] { open_settings_page(SettingsPage::Language); });
+        nav_row(panel, icon::info, tr(i18n::Str::page_about), tr(i18n::Str::page_about_sub), [] { open_settings_page(SettingsPage::About); });
     }
 
     ScreenId tab() const override { return ScreenId::Settings; }
     std::string title() const override { return tr(i18n::Str::nav_settings); }
 
+    static std::string dim_label(int s) { return s < 60 ? std::to_string(s) + " s" : std::to_string(s / 60) + " min"; }
+
 private:
-    // Each language names itself, so it is findable whatever language is active.
-    static std::string language_label(i18n::Lang lang) {
-        i18n::Lang current = i18n::language();
-        i18n::set_language(lang);
-        std::string name = tr(i18n::Str::language_name_self);
-        i18n::set_language(current);
-        return name;
-    }
-
-    static lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
-        lv_obj_t* c = kit::column(parent, 16);
-        lv_obj_set_flex_grow(c, 1);
-        lv_obj_set_width(c, 1);
-        lv_obj_set_style_pad_all(c, 28, 0);
-        lv_obj_set_style_radius(c, theme::kRadiusCard, 0);
-        lv_obj_set_style_bg_color(c, theme::surface(), 0);
-        lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-        kit::text(c, title, theme::h2(), theme::text());
-        return c;
-    }
-
-    static void speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected) {
-        lv_obj_t* r = kit::row(parent, 16);
-        lv_obj_set_size(r, lv_pct(100), 72);
-        lv_obj_set_style_pad_hor(r, 16, 0);
-        lv_obj_set_style_radius(r, theme::kRadiusRow, 0);
-        lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(r, selected ? theme::elevated() : theme::surface(), 0);
-        lv_obj_set_style_bg_color(r, lv_color_mix(lv_color_white(), theme::elevated(), 31), LV_STATE_PRESSED);
-        kit::icon(r, icon::speaker, 28, selected ? theme::accent() : theme::text2());
-        lv_obj_t* name = kit::text(r, p.name, theme::body(), p.available ? theme::text() : theme::text3());
-        lv_obj_set_flex_grow(name, 1);
-        if (selected) kit::icon(r, icon::check, 28, theme::accent());
-        std::string id = p.player_id;
-        kit::on_click(r, [id] { send(app::cmd::SelectPlayer{id}); });
-    }
-
     lv_obj_t* root_ = nullptr;
 };
 

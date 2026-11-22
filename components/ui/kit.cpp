@@ -373,8 +373,9 @@ lv_obj_t* toggle(lv_obj_t* parent, bool on, std::function<void(bool)> on_change)
 namespace {
 struct Keys {
     std::string del, done, space;
-    const char* letters[38];
-    const char* digits[38];
+    const char* lower[39];
+    const char* upper[39];
+    const char* digits[39];
     lv_obj_t* input;
     Action on_done;
 };
@@ -383,32 +384,42 @@ constexpr lv_buttonmatrix_ctrl_t w(int n) { return static_cast<lv_buttonmatrix_c
 const lv_buttonmatrix_ctrl_t kKeyCtrl[] = {w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(7),
                                            w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(8),
                                            w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4), w(4),
-                                           w(5), w(15), w(5)};
+                                           w(5), w(5), w(15), w(5)};
 }  // namespace
 
 lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& del, const std::string& done,
                    const std::string& space, Action on_done) {
-    auto* k = new Keys{del, done, space, {}, {}, input, std::move(on_done)};
+    auto* k = new Keys{del, done, space, {}, {}, {}, input, std::move(on_done)};
     const char* d = k->del.c_str();
     const char* g = k->done.c_str();
     const char* sp = k->space.c_str();
-    const char* letters[] = {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", d, "\n",
-                             "a", "s", "d", "f", "g", "h", "j", "k", "l", g, "\n",
-                             "z", "x", "c", "v", "b", "n", "m", ",", ".", "'", "\n",
-                             "123", sp, "-", ""};
+    // Bottom row: mode switches (123 / ABC / abc), space, dash. Passwords need capitals and symbols.
+    const char* lower[] = {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p", d, "\n",
+                           "a", "s", "d", "f", "g", "h", "j", "k", "l", g, "\n",
+                           "z", "x", "c", "v", "b", "n", "m", ",", ".", "'", "\n",
+                           "123", "ABC", sp, "-", ""};
+    const char* upper[] = {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", d, "\n",
+                           "A", "S", "D", "F", "G", "H", "J", "K", "L", g, "\n",
+                           "Z", "X", "C", "V", "B", "N", "M", ",", ".", "'", "\n",
+                           "123", "abc", sp, "-", ""};
     const char* digits[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", d, "\n",
-                            "&", "(", ")", "!", "?", ":", "/", "+", "#", g, "\n",
-                            "é", "è", "ë", "ü", "ö", "ä", "ç", "ñ", "ø", "å", "\n",
-                            "abc", sp, "-", ""};
-    static_assert(sizeof letters / sizeof *letters == 38 && sizeof digits / sizeof *digits == 38, "key maps");
-    std::copy(std::begin(letters), std::end(letters), k->letters);
+                            "@", "#", "&", "(", ")", "!", "?", ":", "/", g, "\n",
+                            "_", "*", "$", "%", "=", "+", ";", "\"", "é", "ë", "\n",
+                            "abc", "ABC", sp, "-", ""};
+    static_assert(sizeof lower / sizeof *lower == 39 && sizeof upper / sizeof *upper == 39 &&
+                  sizeof digits / sizeof *digits == 39, "key maps");
+    std::copy(std::begin(lower), std::end(lower), k->lower);
+    std::copy(std::begin(upper), std::end(upper), k->upper);
     std::copy(std::begin(digits), std::end(digits), k->digits);
 
-    lv_obj_t* kb = lv_keyboard_create(parent);
-    lv_obj_remove_event_cb(kb, lv_keyboard_def_event_cb);
-    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_TEXT_LOWER, k->letters, kKeyCtrl);
-    lv_keyboard_set_map(kb, LV_KEYBOARD_MODE_NUMBER, k->digits, kKeyCtrl);
-    lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
+    // A plain button matrix, not lv_keyboard: lv_keyboard keeps custom maps in one global table
+    // shared by every keyboard, so deleting one leaves the others pointing at freed maps.
+    lv_obj_t* kb = lv_buttonmatrix_create(parent);
+    auto set_map = [k](lv_obj_t* m, const char** map) {
+        lv_buttonmatrix_set_map(m, map);
+        lv_buttonmatrix_set_ctrl_map(m, kKeyCtrl);
+    };
+    set_map(kb, k->lower);
     lv_obj_set_size(kb, theme::kScreenW, 316);
     lv_obj_set_style_bg_color(kb, theme::surface(), 0);
     lv_obj_set_style_bg_opa(kb, LV_OPA_COVER, 0);
@@ -432,8 +443,9 @@ lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& del, co
         if (key == k->del) lv_textarea_delete_char(k->input);
         else if (key == k->done) { if (k->on_done) k->on_done(); }
         else if (key == k->space) lv_textarea_add_char(k->input, ' ');
-        else if (key == "123") lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_NUMBER);
-        else if (key == "abc") lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
+        else if (key == "123") { lv_buttonmatrix_set_map(kb, k->digits); lv_buttonmatrix_set_ctrl_map(kb, kKeyCtrl); }
+        else if (key == "abc") { lv_buttonmatrix_set_map(kb, k->lower); lv_buttonmatrix_set_ctrl_map(kb, kKeyCtrl); }
+        else if (key == "ABC") { lv_buttonmatrix_set_map(kb, k->upper); lv_buttonmatrix_set_ctrl_map(kb, kKeyCtrl); }
         else lv_textarea_add_text(k->input, key.c_str());
     }, LV_EVENT_VALUE_CHANGED, k);
     lv_obj_add_event_cb(kb, [](lv_event_t* e) { delete static_cast<Keys*>(lv_event_get_user_data(e)); }, LV_EVENT_DELETE, k);

@@ -10,7 +10,7 @@ namespace app {
 
 class App {
 public:
-    App(backend::Backend& backend, Settings& settings, std::function<void(Update)> publish);
+    App(backend::Backend& backend, Settings& settings, Platform& platform, std::function<void(Update)> publish);
 
     void start();
     void handle(const Command& command);

@@ -3,9 +3,30 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "core/model.hpp"
 #include "i18n/i18n.hpp"
+
+namespace app {
+
+// Screen & night mode (Settings › Screen). Times in minutes since midnight.
+struct DisplaySettings {
+    int brightness = 80;
+    int dim_after_s = 120;  // 0 = never
+    bool clock_when_dimmed = true;
+    bool night = true;
+    int night_from = 22 * 60, night_to = 7 * 60;
+    int night_brightness = 15;
+};
+
+struct Diagnostics {
+    bool fps = false, touches = false;
+};
+
+enum class SetupStep : uint8_t { Welcome, Wifi, WifiPassword, Server, SignIn, Speaker, Done, Finished };
+
+}  // namespace app
 
 namespace app {
 namespace cmd {
@@ -39,6 +60,25 @@ struct CreatePlaylist { std::string name; std::optional<core::MediaItem> first_i
 struct RemoveFromPlaylist { core::MediaItem playlist; int position; };
 struct DeletePlaylist { core::MediaItem playlist; };
 
+// First-time setup (features/setup.cpp).
+struct SetupGo { SetupStep step; };                                 // Back / Continue
+struct SetupScanWifi {};
+struct SetupJoinWifi { std::string ssid, password; };
+struct SetupFindServers {};
+struct SetupUseServer { std::string address; };                     // "host[:port]" or ws:// URL
+struct SetupToken { std::string token; };
+struct SetupFinish {};
+
+// This panel (features/panel.cpp).
+struct SetDisplay { DisplaySettings display; };
+struct SetDimmed { bool dimmed; };                                  // UI: idle → dimmed clock
+struct SetDiagnostics { Diagnostics diagnostics; };
+struct SetSourceOrder { std::vector<std::string> providers; };      // provider domains, best first
+struct Reconnect {};
+struct SignInAgain {};
+struct RestartPanel {};
+struct ResetPanel {};                                               // erase settings, back to setup
+
 // Internal broadcast between features (not sent by the UI).
 struct PlayerChanged { std::string player_id; };
 
@@ -48,6 +88,10 @@ using Command = std::variant<cmd::Search, cmd::Play, cmd::AddToQueue, cmd::PlayP
                              cmd::Seek, cmd::SetShuffle, cmd::SetRepeat, cmd::SelectPlayer, cmd::SetVolume,
                              cmd::ClearUpNext, cmd::RemoveFromQueue, cmd::MoveInQueue, cmd::PlayQueueIndex,
                              cmd::SetFavourite, cmd::SetLanguage, cmd::Browse, cmd::LoadPlaylists, cmd::AddToPlaylist,
-                             cmd::CreatePlaylist, cmd::RemoveFromPlaylist, cmd::DeletePlaylist, cmd::PlayerChanged>;
+                             cmd::CreatePlaylist, cmd::RemoveFromPlaylist, cmd::DeletePlaylist, cmd::SetupGo,
+                             cmd::SetupScanWifi, cmd::SetupJoinWifi, cmd::SetupFindServers, cmd::SetupUseServer,
+                             cmd::SetupToken, cmd::SetupFinish, cmd::SetDisplay, cmd::SetDimmed, cmd::SetDiagnostics,
+                             cmd::SetSourceOrder, cmd::Reconnect, cmd::SignInAgain, cmd::RestartPanel, cmd::ResetPanel,
+                             cmd::PlayerChanged>;
 
 }  // namespace app

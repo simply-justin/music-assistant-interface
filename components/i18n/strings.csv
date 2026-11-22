@@ -107,3 +107,153 @@ tag_source,+{} source,+{} bron
 tag_sources,+{} sources,+{} bronnen
 provider_files,Files,Bestanden
 volume_hint_single,− and + step by 5.,− en + verspringen per 5.
+day_0,Sunday,zondag
+day_1,Monday,maandag
+day_2,Tuesday,dinsdag
+day_3,Wednesday,woensdag
+day_4,Thursday,donderdag
+day_5,Friday,vrijdag
+day_6,Saturday,zaterdag
+month_1,January,januari
+month_2,February,februari
+month_3,March,maart
+month_4,April,april
+month_5,May,mei
+month_6,June,juni
+month_7,July,juli
+month_8,August,augustus
+month_9,September,september
+month_10,October,oktober
+month_11,November,november
+month_12,December,december
+ambient_tap,Tap anywhere to wake,Tik ergens om te wekken
+boot_title,Starting up,Opstarten
+boot_body,This usually takes a few seconds.,Dit duurt meestal een paar seconden.
+boot_wifi,Connecting to Wi-Fi,Verbinden met wifi
+boot_wifi_ok,Wi-Fi connected,Wifi verbonden
+boot_server,Connecting to Music Assistant,Verbinden met Music Assistant
+boot_restoring,Restoring,Herstellen
+boot_slow,Taking longer than a minute? Check that the Music Assistant server is switched on.,Duurt het langer dan een minuut? Controleer of de Music Assistant-server aan staat.
+offline_title,Can't reach Music Assistant,Music Assistant niet bereikbaar
+offline_body,Trying again automatically. Your favourites will play as soon as it's back.,Wordt automatisch opnieuw geprobeerd. Je favorieten spelen zodra hij terug is.
+offline_retry,Retry now,Nu opnieuw
+np_error_title,Couldn't play this song,Dit nummer kon niet spelen
+np_error_body,{} can't play it right now.,{} kan het nu niet afspelen.
+np_skip,Skip,Overslaan
+queue_provider_down,{} isn't responding,{} reageert niet
+queue_provider_down_body,{} songs below may be skipped. Trying again in the background.,{} nummers hieronder worden misschien overgeslagen. Wordt op de achtergrond opnieuw geprobeerd.
+preview_open,Open,Openen
+page_display,Screen & night mode,Scherm en nachtmodus
+page_wifi,Wi-Fi,Wifi
+page_about,About & diagnostics,Over en diagnose
+page_about_sub,"Software version, memory, frame rate","Softwareversie, geheugen, beeldsnelheid"
+settings_dims_after,Dims after {},Dimt na {}
+settings_night_range,Night {},Nacht {}
+dim_never,Never,Nooit
+display_day,Daytime,Overdag
+display_brightness,Brightness,Helderheid
+display_dim_after,Dim after,Dimmen na
+display_clock,Show clock when dimmed,Klok tonen bij dimmen
+display_clock_sub,With what's playing underneath,Met wat er speelt eronder
+display_preview,Preview dimmed screen,Gedimd scherm bekijken
+display_night,Night mode,Nachtmodus
+display_schedule,Dim on a schedule,Dimmen volgens schema
+display_schedule_sub,"Darker screen, no clock glare","Donkerder scherm, geen felle klok"
+display_from,From,Van
+display_until,Until,Tot
+display_night_brightness,Night brightness,Helderheid 's nachts
+display_night_now,Night mode is on now,Nachtmodus is nu aan
+wifi_not_connected,Not connected,Niet verbonden
+wifi_strong,Strong signal,Sterk signaal
+wifi_ok,Good signal,Goed signaal
+wifi_weak,Weak signal,Zwak signaal
+wifi_address,Panel address,Adres van dit scherm
+wifi_signal,Signal,Signaal
+wifi_change,Change network,Ander netwerk
+wifi_drops,If Wi-Fi drops,Als de wifi wegvalt
+wifi_drops_body,"The panel reconnects by itself and keeps your speaker choice. Music already playing carries on — it comes from the speaker, not this screen.","Het scherm maakt zelf weer verbinding en onthoudt je speaker. Muziek die al speelt gaat door — die komt van de speaker, niet van dit scherm."
+server_server,Server,Server
+server_version,Version,Versie
+server_signed_in,Signed in,Aangemeld
+server_token_ending,Token ending ••••{},Token eindigend op ••••{}
+server_change,Change server,Andere server
+server_sign_in_again,Sign in again,Opnieuw aanmelden
+server_services,Music services,Muziekdiensten
+server_working,Working,Werkt
+server_not_responding,Not responding,Reageert niet
+server_order,When a song is on several services,Als een nummer op meerdere diensten staat
+server_order_sub,Play it from the first one that has it.,Speel het af van de eerste die het heeft.
+server_library_first,Library & favourites,Bibliotheek en favorieten
+language_hint,"Song, artist and album names stay as Music Assistant sends them.","Namen van nummers, artiesten en albums blijven zoals Music Assistant ze stuurt."
+about_title,About,Over
+about_software,Panel software,Software van dit scherm
+about_running,Running for,Draait al
+about_memory,Memory free,Vrij geheugen
+about_memory_value,Internal {},Intern {}
+about_restart,Restart panel,Scherm herstarten
+about_restart_q,Restart the panel?,Scherm herstarten?
+about_restart_body,Music keeps playing on the speaker. The panel is back in a few seconds.,De muziek speelt door op de speaker. Het scherm is over een paar seconden terug.
+about_reset,Reset and set up again,Resetten en opnieuw instellen
+about_reset_q,Reset this panel?,Dit scherm resetten?
+about_reset_body,"Forgets Wi-Fi, server, sign-in and settings, then starts the setup again.","Vergeet wifi, server, aanmelding en instellingen en start daarna de installatie opnieuw."
+about_diagnostics,Diagnostics,Diagnose
+about_fps,Show frame rate,Beeldsnelheid tonen
+about_fps_sub,Small FPS counter in the corner,Kleine FPS-teller in de hoek
+about_touches,Show touch points,Aanrakingen tonen
+about_touches_sub,Dot where each touch lands,Stip waar je aanraakt
+setup_title,Set up,Instellen
+setup_step,Step {} of 5,Stap {} van 5
+setup_back,Back,Terug
+setup_continue,Continue,Verder
+setup_welcome_title,Let's set up your music,Laten we je muziek instellen
+setup_welcome_body,"Four quick steps: Wi-Fi, your Music Assistant server, sign-in and which speaker to play on.","Vier korte stappen: wifi, je Music Assistant-server, aanmelden en op welke speaker je wilt afspelen."
+setup_get_started,Get started,Beginnen
+setup_wifi_title,Connect to Wi-Fi,Verbinden met wifi
+setup_wifi_body,Pick the network this panel should use. Your Music Assistant server needs to be on the same network.,Kies het netwerk voor dit scherm. Je Music Assistant-server moet op hetzelfde netwerk zitten.
+setup_networks,Networks nearby,Netwerken in de buurt
+setup_scanning,Looking for networks…,Netwerken zoeken…
+setup_scan_again,Scan again,Opnieuw zoeken
+setup_join,Join {},Verbinden met {}
+setup_password_for,Password for {},Wachtwoord voor {}
+setup_join_key,Join,Verbind
+setup_joining,Connecting…,Verbinden…
+setup_wrong_password,That password didn't work. Check capitals and try again.,Dat wachtwoord werkte niet. Let op hoofdletters en probeer opnieuw.
+setup_wifi_failed,Couldn't connect to that network. Try again.,Kon niet met dat netwerk verbinden. Probeer opnieuw.
+setup_server_title,Find your music server,Vind je muziekserver
+setup_server_body,This panel plays everything through Music Assistant. Pick your server.,Dit scherm speelt alles af via Music Assistant. Kies je server.
+setup_found,Found on your network,Gevonden op je netwerk
+setup_still_looking,Still looking…,Nog aan het zoeken…
+setup_no_server,No Music Assistant server found,Geen Music Assistant-server gevonden
+setup_no_server_hint,Is the server switched on? Is this panel on the same Wi-Fi as the server?,Staat de server aan? Zit dit scherm op dezelfde wifi als de server?
+setup_search_again,Search again,Opnieuw zoeken
+setup_enter_address,Or enter the address,Of vul het adres in
+setup_address_example,e.g. 192.168.1.20:8095,bijv. 192.168.1.20:8095
+setup_connect_key,Connect,Verbind
+setup_checking,Checking {}…,{} controleren…
+setup_server_error,Nothing answered at that address. Music Assistant usually uses port 8095.,Niets reageerde op dat adres. Music Assistant gebruikt meestal poort 8095.
+setup_signin_title,Sign in,Aanmelden
+setup_signin_body,"Your server asks for an access token. Typing one on a wall screen is painful, so send it from your phone.","Je server vraagt om een toegangstoken. Typen op een wandscherm is lastig, dus stuur het vanaf je telefoon."
+setup_use_phone,Use your phone,Gebruik je telefoon
+setup_phone_1,"Scan the code, or open {}","Scan de code, of open {}"
+setup_phone_2,"In Music Assistant, create a long-lived token in your profile",Maak in Music Assistant een langlevend token aan in je profiel
+setup_phone_3,Paste it on that page,Plak het op die pagina
+setup_waiting_token,Waiting for the token…,Wachten op het token…
+setup_checking_token,Checking the token…,Token controleren…
+setup_token_rejected,The server didn't accept that token,De server accepteerde dat token niet
+setup_token_rejected_body,"It may have been copied only in part, or deleted. Create a new one and paste it again.","Misschien is het maar deels gekopieerd, of verwijderd. Maak een nieuw token en plak het opnieuw."
+setup_type_token,Type the token here instead,Token hier typen
+setup_token_placeholder,Paste or type the token,Plak of typ het token
+setup_signin_key,Sign in,Aanmelden
+setup_speaker_title,Choose a speaker,Kies een speaker
+setup_speaker_body,Where should music play when someone taps this panel? You can change it later.,Waar moet muziek spelen als iemand op dit scherm tikt? Je kunt het later wijzigen.
+setup_available,Available,Beschikbaar
+setup_group,Group,Groep
+setup_offline,Offline,Offline
+setup_done_title,You're all set,Alles is klaar
+setup_tip1,Favourites come first,Favorieten eerst
+setup_tip1_body,Anything you favourite appears on Home for one-tap play.,"Alles wat je als favoriet markeert staat op Home, met één tik te spelen."
+setup_tip2,One search for everything,Eén zoekbalk voor alles
+setup_tip2_body,"Spotify, YouTube Music, radio and your library together.","Spotify, YouTube Music, radio en je bibliotheek samen."
+setup_tip3,Dims when idle,Dimt als niemand het gebruikt
+setup_tip3_body,The screen dims after a while. Tap to wake.,Het scherm dimt na een tijdje. Tik om te wekken.
+setup_start,Start listening,Begin met luisteren

@@ -185,6 +185,44 @@ void open_track_menu(const core::MediaItem& item) {
     }
 }
 
+// Long-press on a Home favourite: what it is and what you can do with it.
+void open_favourite_preview(const core::MediaItem& item) {
+    kit::close_sheets();
+    lv_obj_t* s = kit::sheet(760);
+    lv_obj_t* head = kit::row(s, 24);
+    lv_obj_set_width(head, lv_pct(100));
+    kit::art(head, item, 120, 14);
+    lv_obj_t* col = kit::column(head, 6);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_width(col, 1);
+    kit::text(col, item.name, theme::h2(), theme::text());
+    lv_obj_t* sub = kit::row(col, 8);
+    kit::text(sub, kit::subtitle(item), theme::body(), theme::text2());
+    kit::badge(sub, item.badge_provider());
+    kit::icon_button(head, icon::close, [] { kit::close_sheets(); }, 56, 28, true);
+    auto it = item;
+    lv_obj_t* main = kit::row(s, 12);
+    kit::button(main, kit::Button::Primary, icon::play, tr(i18n::Str::detail_play), [it] { play(it); kit::close_sheets(); });
+    if (item.type != core::MediaType::Radio && item.type != core::MediaType::Track)
+        kit::button(main, kit::Button::Secondary, icon::shuffle, tr(i18n::Str::queue_shuffle), [it] {
+            send(app::cmd::SetShuffle{true});
+            play(it);
+            kit::close_sheets();
+        });
+    lv_obj_t* actions = kit::column(s, 2);
+    lv_obj_set_width(actions, lv_pct(100));
+    if (item.type != core::MediaType::Radio) {
+        menu_row(actions, icon::play_next, tr(i18n::Str::menu_play_next), [it] { send(app::cmd::AddToQueue{it, true}); kit::close_sheets(); });
+        menu_row(actions, icon::add_to_queue, tr(i18n::Str::menu_add_to_queue), [it] { send(app::cmd::AddToQueue{it}); kit::close_sheets(); });
+    }
+    if (item.type == core::MediaType::Album || item.type == core::MediaType::Playlist || item.type == core::MediaType::Artist)
+        menu_row(actions, icon::chevron_right, tr(i18n::Str::preview_open), [it] { open_detail(it); });
+    menu_row(actions, icon::heart_filled, tr(i18n::Str::menu_remove_favourite), [it] {
+        send(app::cmd::SetFavourite{it, false});
+        kit::close_sheets();
+    });
+}
+
 void open_add_to_playlist(const core::MediaItem& item) {
     kit::close_sheets();
     send(app::cmd::LoadPlaylists{});

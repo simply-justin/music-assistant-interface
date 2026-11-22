@@ -1,5 +1,8 @@
 // Queue: now playing on the left, "Up next" on the right. Tap plays, × removes, long-press offers
 // Play next / Move up / Move down (no drag: expensive in a recycled LVGL list).
+#include <algorithm>
+#include <map>
+
 #include "../shell.hpp"
 #include "../text.hpp"
 
@@ -76,6 +79,15 @@ private:
         if (!count) {
             kit::text(right_, tr(i18n::Str::queue_empty), theme::lead(), theme::text2(), true);
             return;
+        }
+        // A service that isn't answering: its songs below are marked unavailable by Music Assistant.
+        std::map<std::string, int> down;
+        for (size_t i = first; i < q->items.size(); ++i)
+            if (!q->items[i].available && q->items[i].media) ++down[q->items[i].media->badge_provider()];
+        if (!down.empty()) {
+            auto worst = std::max_element(down.begin(), down.end(), [](auto& a, auto& b) { return a.second < b.second; });
+            banner(right_, i18n::tr(i18n::Str::queue_provider_down, kit::provider_name(worst->first)),
+                   i18n::tr(i18n::Str::queue_provider_down_body, std::to_string(worst->second)));
         }
         lv_obj_t* list = kit::scroll_column(right_, 4);
         lv_obj_set_width(list, lv_pct(100));

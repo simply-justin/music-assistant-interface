@@ -22,10 +22,27 @@ public:
         : url_(std::move(url)), session_([this](const std::string& t) { return ws_.send_text(t); }, std::move(token)) {}
 
     void set_listener(Listener l) override { session_.set_listener(std::move(l)); }
-    void start() override { try_connect(); }
+    void start() override {
+        if (!url_.empty()) try_connect();
+    }
     void request(backend::Request req, Done done) override { session_.request(std::move(req), std::move(done)); }
 
+    void configure(const std::string& url, const std::string& token) override {
+        url_ = url;
+        session_.set_token(token);
+        reconnect();
+    }
+
+    void reconnect() override {
+        if (ws_.connected()) {
+            ws_.close();
+            session_.on_closed();
+        }
+        try_connect();
+    }
+
     void tick(uint32_t now) override {
+        if (url_.empty()) return;  // not set up yet
         if (!ws_.connected()) {
             if (now >= retry_at_) try_connect();
             return;
@@ -41,6 +58,7 @@ public:
 
 private:
     void try_connect() {
+        if (url_.empty()) return;
         if (ws_.connect(url_)) {
             session_.on_open();
         } else {

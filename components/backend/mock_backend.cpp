@@ -125,9 +125,21 @@ void MockBackend::tick(uint32_t now_ms) {
 }
 
 void MockBackend::start() {
+    if (url_.empty()) return;
     later(latency_.command_ms, [this] {
-        if (listener_.on_connection) listener_.on_connection(Connection::Connected, ServerInfo{"mock", "mock", 0});
+        if (!listener_.on_connection) return;
+        ServerInfo info{"mock", "mock", 65};
+        if (url_.find("bad") != std::string::npos) return listener_.on_connection(Connection::Disconnected, {});
+        listener_.on_connection(Connection::Connecting, info);
+        Connection c = token_.empty() ? Connection::AuthRequired : token_ == "bad" ? Connection::AuthFailed : Connection::Connected;
+        listener_.on_connection(c, info);
     });
+}
+
+void MockBackend::configure(const std::string& url, const std::string& token) {
+    url_ = url;
+    token_ = token;
+    start();
 }
 
 void MockBackend::emit(const char* event, const std::string& object_id, Json data) {
@@ -202,6 +214,13 @@ Response MockBackend::handle(const Request& req) {
         cJSON_ArrayForEach(item, catalog_.get()) {
             if (json_str(item, "media_type") == "track") cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
         }
+    } else if (c == "providers") {
+        r.result.reset(cJSON_Parse(R"json([
+          {"instance_id":"builtin","domain":"builtin","name":"Music Assistant","available":true,"is_streaming_provider":false},
+          {"instance_id":"spotify--a1","domain":"spotify","name":"Spotify","available":true,"is_streaming_provider":true},
+          {"instance_id":"ytmusic--b2","domain":"ytmusic","name":"YouTube Music","available":false,"is_streaming_provider":true},
+          {"instance_id":"tunein--c3","domain":"tunein","name":"TuneIn","available":true,"is_streaming_provider":true}
+        ])json"));
     } else if (c == "player_queues/get_active_queue") {
         r.result = queue_object(json_str(args, "player_id"));
     } else if (c == "players/all") {

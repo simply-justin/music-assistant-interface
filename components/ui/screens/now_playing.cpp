@@ -68,6 +68,17 @@ private:
         }
         lv_obj_set_style_bg_color(root_, background(theme::art_colour(item->uri.c_str())), 0);
         bool radio = item->type == core::MediaType::Radio;
+        // Playback error: shown only when Music Assistant marks the current item unavailable
+        // (QueueItem.available, verified 2.10). Open question 2: a richer error signal, if any.
+        const auto* q = state().queue.get();
+        if (q && q->current && !q->current->available) {
+            lv_obj_t* wrap = kit::row(root_);
+            lv_obj_set_width(wrap, lv_pct(100));
+            lv_obj_set_style_pad_hor(wrap, 80, 0);
+            lv_obj_t* b = banner(wrap, tr(i18n::Str::np_error_title),
+                                 i18n::tr(i18n::Str::np_error_body, kit::provider_name(item->badge_provider())));
+            kit::button(b, kit::Button::Secondary, icon::next, tr(i18n::Str::np_skip), [] { send(app::cmd::Next{}); });
+        }
 
         lv_obj_t* body = kit::row(root_, 72);
         lv_obj_set_width(body, lv_pct(100));
@@ -109,7 +120,6 @@ private:
         lv_obj_set_width(controls, lv_pct(100));
         lv_obj_set_flex_align(controls, radio ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                               LV_FLEX_ALIGN_CENTER);
-        const auto* q = state().queue.get();
         bool prev_next = !radio && (!p || p->can_next_previous);
         if (!radio) {
             bool on = q && q->shuffle;

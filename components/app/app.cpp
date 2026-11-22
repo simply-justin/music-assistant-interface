@@ -15,8 +15,8 @@ void Context::send(backend::Request req, std::function<void(backend::Response&&)
     });
 }
 
-App::App(backend::Backend& backend, Settings& settings, std::function<void(Update)> publish)
-    : ctx_{backend, settings, std::move(publish), {}, 0, {}, {}, {}} {
+App::App(backend::Backend& backend, Settings& settings, Platform& platform, std::function<void(Update)> publish)
+    : ctx_{backend, settings, platform, std::move(publish), {}, 0, {}, {}, {}} {
     ctx_.dispatch = [this](Command c) { handle(c); };
 }
 
@@ -38,10 +38,14 @@ void App::start() {
             if (c == backend::Connection::Connected && !info.server_id.empty() && ctx_.settings.get("server_id").empty())
                 ctx_.settings.set("server_id", info.server_id);
             ctx_.publish(ConnectionView{c, info});  // the UI reloads its lists when this says Connected
+            for (auto& f : features_) f->on_connection(c);
             if (c == backend::Connection::Connected)
                 for (auto& f : features_) f->on_connected();
         },
     });
+    // Saved server (empty until first-time setup has run).
+    std::string url = ctx_.settings.get("server_url");
+    if (!url.empty()) ctx_.backend.configure(url, ctx_.settings.get("token"));
     ctx_.backend.start();
 }
 

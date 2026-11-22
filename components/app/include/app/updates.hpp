@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "app/commands.hpp"
+#include "app/platform.hpp"
 #include "backend/backend.hpp"
 #include "core/model.hpp"
 #include "core/search.hpp"
@@ -40,13 +41,46 @@ struct BrowseView {
     std::vector<core::MediaItem> items;
 };
 
+struct SetupView {
+    SetupStep step = SetupStep::Welcome;
+    std::vector<WifiNetwork> networks;
+    bool scanning = false;
+    std::string ssid;                    // network being joined
+    bool joining = false;
+    std::optional<WifiResult> wifi_error;
+    std::vector<ServerCandidate> servers;
+    bool searching = false;
+    std::string address;                 // server being checked / chosen
+    bool checking = false, server_error = false;
+    std::string pairing_url;
+    bool token_error = false;
+};
+
+struct Provider {
+    std::string instance_id, domain, name;
+    bool available = true, streaming = false;
+};
+
+struct PanelView {
+    DisplaySettings display;
+    Diagnostics diagnostics;
+    bool night_now = false, dimmed = false;
+    WifiStatus wifi;
+    SystemInfo system;
+    std::string server_address;
+    std::string token_hint;              // last 4 characters only
+    std::vector<Provider> providers;     // music services from the server
+    std::vector<std::string> source_order;
+};
+
 struct PlaylistsView {
     std::vector<core::MediaItem> playlists;  // library playlists; `editable` ones go in the picker
 };
 
 using Update = std::variant<ConnectionView, std::shared_ptr<const core::SearchView>, std::shared_ptr<const PlayersView>,
                             std::shared_ptr<const core::QueueState>, std::shared_ptr<const PlaylistsView>,
-                            std::shared_ptr<const BrowseView>, Toast,
+                            std::shared_ptr<const BrowseView>, std::shared_ptr<const SetupView>,
+                            std::shared_ptr<const PanelView>, Toast,
                             LanguageChanged>;
 
 }  // namespace app

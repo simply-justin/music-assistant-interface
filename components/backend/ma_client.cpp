@@ -26,7 +26,25 @@ Client::~Client() {
     }
 }
 
+void Client::configure(const std::string& url, const std::string& token) {
+    url_ = url;
+    session_.set_token(token);
+    if (!ws_) return start();
+    esp_websocket_client_stop(ws_);  // blocks until the socket task is down
+    session_.on_closed();
+    esp_websocket_client_set_uri(ws_, url_.c_str());
+    esp_websocket_client_start(ws_);
+}
+
+void Client::reconnect() {
+    if (!ws_) return start();
+    esp_websocket_client_stop(ws_);
+    session_.on_closed();
+    esp_websocket_client_start(ws_);
+}
+
 void Client::start() {
+    if (url_.empty()) return;  // not set up yet: the Setup flow calls configure()
     esp_websocket_client_config_t cfg = {};
     cfg.uri = url_.c_str();
     cfg.buffer_size = 4096;

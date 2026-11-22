@@ -101,7 +101,7 @@ void Session::on_server_info(const cJSON* msg) {
     if (info_.schema_version < kMinSchemaVersion) return set_connection(Connection::IncompatibleServer);
     if (!expected_server_id_.empty() && info_.server_id != expected_server_id_)
         return set_connection(Connection::WrongServer);
-    if (token_.empty()) return set_connection(Connection::Connected);
+    if (token_.empty()) return set_connection(Connection::AuthRequired);  // auth is mandatory (schema ≥ 28)
 
     Json args(cJSON_CreateObject());
     cJSON_AddStringToObject(args.get(), "token", token_.c_str());

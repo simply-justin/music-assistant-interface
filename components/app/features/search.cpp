@@ -13,8 +13,11 @@ public:
     explicit Search(Context& ctx) : ctx_(ctx), session_(ctx.prefs) {}
 
     void on_command(const Command& c) override {
-        if (auto* s = std::get_if<cmd::Search>(&c))
+        if (auto* s = std::get_if<cmd::Search>(&c)) {
             if (session_.set_query(s->text, ctx_.now_ms)) publish();
+        } else if (std::holds_alternative<cmd::SetSourceOrder>(c)) {
+            session_.set_prefs(ctx_.prefs);  // the panel feature already updated ctx_.prefs
+        }
     }
 
     void tick() override {

@@ -20,6 +20,12 @@ public:
     void start() override;
     void request(Request req, Done done) override;
     void tick(uint32_t now_ms) override;
+    // Mock rules: url containing "bad" never answers, empty token → AuthRequired,
+    // token "bad" → AuthFailed, anything else connects.
+    void configure(const std::string& url, const std::string& token) override;
+    void reconnect() override { start(); }
+    // Starts unconfigured (first-time setup) instead of connected.
+    void set_unconfigured() { url_.clear(); }
 
 private:
     struct Delivery {
@@ -34,6 +40,7 @@ private:
     Json queue_object(const std::string& queue_id) const;
 
     MockLatency latency_;
+    std::string url_ = "mock", token_ = "mock-token";
     Listener listener_;
     uint32_t now_ms_ = 0;
     std::deque<Delivery> deliveries_;

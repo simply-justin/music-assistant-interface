@@ -11,6 +11,7 @@
 
 #include "app/app.hpp"
 #include "backend/mock_backend.hpp"
+#include "fake_platform.hpp"
 #include "host_ma_backend.hpp"
 #include "lvgl.h"
 #include "ui/ui.hpp"
@@ -47,9 +48,11 @@ void write_ppm(const std::string& path) {
 int main(int argc, char** argv) {
     const char* live = nullptr;
     const char* shots = nullptr;
-    for (int i = 1; i + 1 < argc; ++i) {
-        if (!std::strcmp(argv[i], "--live")) live = argv[i + 1];
-        if (!std::strcmp(argv[i], "--shots")) shots = argv[i + 1];
+    bool setup = false;  // start at first-time setup (Wi-Fi password in the fake: "music")
+    for (int i = 1; i < argc; ++i) {
+        if (!std::strcmp(argv[i], "--setup")) setup = true;
+        if (i + 1 < argc && !std::strcmp(argv[i], "--live")) live = argv[i + 1];
+        if (i + 1 < argc && !std::strcmp(argv[i], "--shots")) shots = argv[i + 1];
     }
 
     lv_init();
@@ -64,22 +67,37 @@ int main(int argc, char** argv) {
         lv_x11_inputs_create(disp, nullptr);
     }
 
+    app::MemorySettings settings;
+    FakePlatform platform;
     std::unique_ptr<backend::Backend> be;
+    std::string url = "mock", token = "mock-token";
     if (live) {
         auto env = read_env(live);
-        be = std::make_unique<HostMaBackend>(env["MA_URL"], env["MA_TOKEN"]);
+        url = env["MA_URL"];
+        token = env["MA_TOKEN"];
+        be = std::make_unique<HostMaBackend>("", "");
+        // The fake "phone" delivers your token during setup; discovery "finds" your server.
+        platform.server_address = url.substr(5, url.rfind('/') - 5);
+        platform.token = token;
     } else {
-        be = std::make_unique<backend::MockBackend>();
+        auto mock = std::make_unique<backend::MockBackend>();
+        if (setup) mock->set_unconfigured();
+        be = std::move(mock);
     }
-    app::MemorySettings settings;
+    if (!setup) {  // already set up: skip straight to the panel
+        settings.set("server_url", url);
+        settings.set("token", token);
+        settings.set("setup_done", "1");
+    }
     std::vector<app::Update> inbox;
-    app::App core(*be, settings, [&](app::Update u) { inbox.push_back(std::move(u)); });
+    app::App core(*be, settings, platform, [&](app::Update u) { inbox.push_back(std::move(u)); });
     core.start();  // first: the UI's first screen already sends commands
     ui::start([&](app::Command c) { core.handle(c); });  // same thread: the queue is just `inbox`
 
     auto run = [&](uint32_t ms) {
         uint32_t end = host_now_ms() + ms;
         while (host_now_ms() < end) {
+            platform.tick(host_now_ms());
             core.tick(host_now_ms());
             auto batch = std::move(inbox);
             inbox.clear();
@@ -102,6 +120,36 @@ int main(int argc, char** argv) {
         write_ppm(dir + "/" + name + ".ppm");
         std::printf("wrote %s/%s.ppm\n", dir.c_str(), name);
     };
+    if (setup) {
+        run(300);
+        shot("s1_welcome");
+        core.handle(app::cmd::SetupGo{app::SetupStep::Wifi});
+        run(1200);
+        shot("s2_wifi");
+        core.handle(app::cmd::SetupGo{app::SetupStep::WifiPassword});
+        core.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "wrong"});
+        run(1300);
+        shot("s3_wifi_wrong_password");
+        core.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "music"});
+        run(2800);
+        shot("s4_server_found");
+        core.handle(app::cmd::SetupUseServer{"bad-address"});
+        run(8500);
+        shot("s5_server_error");
+        core.handle(app::cmd::SetupUseServer{live ? platform.server_address : "mock"});
+        run(500);
+        shot("s6_sign_in");
+        core.handle(app::cmd::SetupToken{"bad"});
+        run(600);
+        shot("s7_token_rejected");
+        run(3500);  // the fake phone delivers the real token
+        shot("s8_speaker");
+        core.handle(app::cmd::SetupGo{app::SetupStep::Done});
+        shot("s9_done");
+        core.handle(app::cmd::SetupFinish{});
+        shot("s10_home_after_setup");
+        return 0;
+    }
     run(1500);
     shot("01_home");
     ui::open(ui::ScreenId::NowPlaying);
@@ -146,9 +194,25 @@ int main(int argc, char** argv) {
     track.alternatives.push_back(alt);
     ui::open_track_menu(track);
     shot("11_track_menu");
+    ui::open_favourite_preview(track);
+    shot("12_favourite_preview");
+    ui::open(ui::ScreenId::Settings);
+    shot("13_settings");
+    ui::open_settings_page(ui::SettingsPage::Display);
+    shot("14_settings_display");
+    ui::open_settings_page(ui::SettingsPage::Server);
+    shot("15_settings_server");
+    ui::open_settings_page(ui::SettingsPage::About);
+    shot("16_settings_about");
+    ui::open_settings_page(ui::SettingsPage::Wifi);
+    shot("17_settings_wifi");
+    ui::open(ui::ScreenId::Home);
+    ui::show_ambient();
+    shot("18_ambient");
+    lv_obj_send_event(lv_obj_get_child(lv_layer_top(), -1), LV_EVENT_SHORT_CLICKED, nullptr);  // wake
     core.handle(app::cmd::SetLanguage{i18n::Lang::nl});
     run(300);
     ui::open(ui::ScreenId::Home);
-    shot("12_home_dutch");
+    shot("19_home_dutch");
     return 0;
 }

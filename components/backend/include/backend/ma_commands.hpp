@@ -30,6 +30,7 @@ backend::Request queue_move_item(const std::string& queue_id, const std::string&
 backend::Request queue_clear(const std::string& queue_id);
 backend::Request queue_play_index(const std::string& queue_id, int index);
 backend::Request players_all();
+backend::Request music_providers();  // running music services: name, available (verified 2.10)
 backend::Request active_queue(const std::string& player_id);  // null when the player is idle
 backend::Request queue_get(const std::string& queue_id);
 backend::Request group_volume(const std::string& player_id, int volume_level);

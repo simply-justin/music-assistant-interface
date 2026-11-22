@@ -12,6 +12,7 @@
 #include "core/search.hpp"
 #include "core/text.hpp"
 #include "i18n/i18n.hpp"
+#include "fake_platform.hpp"
 #include "text.hpp"
 
 static int g_failed = 0;
@@ -256,11 +257,15 @@ static void test_app_with_mock() {
     app::MemorySettings settings;
     settings.set("player", "kitchen");
     std::vector<app::Update> updates;
-    app::App a(mock, settings, [&](app::Update u) { updates.push_back(std::move(u)); });
+    FakePlatform platform;
+    app::App a(mock, settings, platform, [&](app::Update u) { updates.push_back(std::move(u)); });
     a.start();
     uint32_t now = 0;
     auto run_until = [&](uint32_t t) {
-        for (; now <= t; now += 10) a.tick(now);
+        for (; now <= t; now += 10) {
+            platform.tick(now);
+            a.tick(now);
+        }
     };
     run_until(200);
 
@@ -332,6 +337,75 @@ static void test_display_text() {
     CHECK(ui::duration(242) == "4:02" && ui::duration(3723) == "1:02:03" && ui::duration(0) == "0:00");
 }
 
+static void test_setup_flow() {
+    backend::MockBackend mock;
+    mock.set_unconfigured();
+    app::MemorySettings settings;
+    FakePlatform platform;
+    platform.token = "";  // no phone: the user types the token
+    std::shared_ptr<const app::SetupView> view;
+    app::App a(mock, settings, platform, [&](app::Update u) {
+        if (auto* v = std::get_if<std::shared_ptr<const app::SetupView>>(&u)) view = *v;
+    });
+    a.start();
+    uint32_t now = 0;
+    auto run = [&](uint32_t ms) {
+        for (uint32_t end = now + ms; now <= end; now += 10) {
+            platform.tick(now);
+            a.tick(now);
+        }
+    };
+    CHECK(view && view->step == app::SetupStep::Welcome);
+    a.handle(app::cmd::SetupGo{app::SetupStep::Wifi});
+    run(1000);
+    CHECK(view->networks.size() == 4);
+    a.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "wrong"});
+    run(1000);
+    CHECK(view->wifi_error && *view->wifi_error == app::WifiResult::WrongPassword && view->step == app::SetupStep::Wifi);
+    a.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "music"});
+    run(2600);
+    CHECK(view->step == app::SetupStep::Server && view->servers.size() == 1);
+    a.handle(app::cmd::SetupUseServer{"bad-host"});
+    run(8200);
+    CHECK(view->server_error && view->step == app::SetupStep::Server);
+    a.handle(app::cmd::SetupUseServer{"192.168.2.80"});
+    run(200);
+    CHECK(view->step == app::SetupStep::SignIn && !view->pairing_url.empty());
+    CHECK(settings.get("server_url") == "ws://192.168.2.80:8095/ws");
+    a.handle(app::cmd::SetupToken{"bad"});
+    run(200);
+    CHECK(view->token_error && view->step == app::SetupStep::SignIn);
+    a.handle(app::cmd::SetupToken{"good-token"});
+    run(200);
+    CHECK(view->step == app::SetupStep::Speaker && settings.get("token") == "good-token");
+    a.handle(app::cmd::SetupFinish{});
+    CHECK(view->step == app::SetupStep::Finished && settings.get("setup_done") == "1");
+}
+
+static void test_panel_brightness() {
+    backend::MockBackend mock;
+    app::MemorySettings settings;
+    FakePlatform platform;
+    app::App a(mock, settings, platform, [](app::Update) {});
+    a.start();
+    app::DisplaySettings d;
+    d.night = false;
+    d.brightness = 70;
+    a.handle(app::cmd::SetDisplay{d});
+    CHECK(platform.brightness == 70 && settings.get("brightness") == "70");
+    a.handle(app::cmd::SetDimmed{true});
+    CHECK(platform.brightness == 8);
+    d.night = true;
+    d.night_from = 0;
+    d.night_to = 24 * 60;  // always night
+    d.night_brightness = 5;
+    a.handle(app::cmd::SetDimmed{false});
+    a.handle(app::cmd::SetDisplay{d});
+    CHECK(platform.brightness == 5);
+    a.handle(app::cmd::ResetPanel{});
+    CHECK(platform.restarted && settings.get("brightness").empty());
+}
+
 static void test_repeat_guard() {
     RepeatGuard g;
     CHECK(g.allow("a", 0));
@@ -351,6 +425,8 @@ int main() {
     test_app_with_mock();
     test_repeat_guard();
     test_display_text();
+    test_setup_flow();
+    test_panel_brightness();
     std::printf(g_failed ? "%d check(s) FAILED\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;
 }

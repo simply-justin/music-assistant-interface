@@ -134,6 +134,12 @@ Request queue_play_index(const std::string& q, int index) {
 
 Request players_all() { return {"players/all", nullptr}; }
 
+Request music_providers() {
+    Request r = make("providers");
+    cJSON_AddStringToObject(r.args.get(), "provider_type", "music");
+    return r;
+}
+
 Request active_queue(const std::string& player_id) {
     Request r = make("player_queues/get_active_queue");
     cJSON_AddStringToObject(r.args.get(), "player_id", player_id.c_str());

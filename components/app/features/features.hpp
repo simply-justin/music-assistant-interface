@@ -11,5 +11,7 @@ std::unique_ptr<Feature> make_favourites(Context& ctx);
 std::unique_ptr<Feature> make_preferences(Context& ctx);
 std::unique_ptr<Feature> make_playlists(Context& ctx);
 std::unique_ptr<Feature> make_browse(Context& ctx);
+std::unique_ptr<Feature> make_setup(Context& ctx);
+std::unique_ptr<Feature> make_panel(Context& ctx);
 
 }  // namespace app

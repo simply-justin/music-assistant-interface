@@ -25,7 +25,8 @@ struct Event {
     Json data;
 };
 
-enum class Connection : uint8_t { Disconnected, Connecting, Connected, AuthFailed, IncompatibleServer, WrongServer };
+// AuthRequired: the server answered but no token is set yet (first-time setup).
+enum class Connection : uint8_t { Disconnected, Connecting, Connected, AuthRequired, AuthFailed, IncompatibleServer, WrongServer };
 
 struct ServerInfo {
     std::string server_id;
@@ -46,6 +47,9 @@ public:
     virtual void start() = 0;
     virtual void request(Request req, Done done) = 0;
     virtual void tick(uint32_t /*now_ms*/) {}
+    // Switch server and/or token (setup, "Sign in again"); reconnects. url: "ws://host:port/ws".
+    virtual void configure(const std::string& url, const std::string& token) = 0;
+    virtual void reconnect() = 0;
 };
 
 }  // namespace backend

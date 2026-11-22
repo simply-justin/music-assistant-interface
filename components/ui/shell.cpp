@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <vector>
 
+#include <ctime>
+
 #include "text.hpp"
 
 namespace ui {
@@ -21,6 +23,10 @@ struct Shell {
     lv_obj_t* mini = nullptr;
     std::vector<lv_obj_t*> rail_items;
     core::MediaItem detail;
+    SettingsPage page = SettingsPage::Display;
+    lv_obj_t* ambient = nullptr;
+    lv_obj_t* ambient_clock = nullptr;
+    bool touches_hooked = false;
 };
 
 Shell& shell() {
@@ -175,8 +181,59 @@ void refresh_mini() {
     kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); });
 }
 
+bool in_setup() {
+    auto& s = shell();
+    return s.current == ScreenId::Setup || s.current == ScreenId::Boot;
+}
+
+void tick_ambient() {
+    auto& s = shell();
+    if (s.ambient) {
+        std::time_t t = std::time(nullptr);
+        std::tm* lt = std::localtime(&t);
+        if (s.ambient_clock) lv_label_set_text(s.ambient_clock, clock_text(lt->tm_hour * 60 + lt->tm_min).c_str());
+        return;
+    }
+    const app::PanelView* p = s.state.panel.get();
+    if (!p || p->display.dim_after_s <= 0 || in_setup()) return;
+    if (lv_display_get_inactive_time(nullptr) >= static_cast<uint32_t>(p->display.dim_after_s) * 1000) show_ambient();
+}
+
+// Diagnostics: a dot where each touch lands (Settings › About & diagnostics).
+void on_touch(lv_event_t* e) {
+    const app::PanelView* p = shell().state.panel.get();
+    if (!p || !p->diagnostics.touches) return;
+    lv_point_t pt;
+    lv_indev_get_point(static_cast<lv_indev_t*>(lv_event_get_target(e)), &pt);
+    lv_obj_t* dot = lv_obj_create(lv_layer_sys());
+    lv_obj_remove_style_all(dot);
+    lv_obj_set_size(dot, 24, 24);
+    lv_obj_set_pos(dot, pt.x - 12, pt.y - 12);
+    lv_obj_set_style_radius(dot, 12, 0);
+    lv_obj_set_style_bg_color(dot, theme::warning(), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_delete_delayed(dot, 400);
+}
+
+void apply_diagnostics() {
+    auto& s = shell();
+    const app::PanelView* p = s.state.panel.get();
+    if (!p) return;
+#if LV_USE_PERF_MONITOR
+    if (p->diagnostics.fps) lv_sysmon_show_performance(nullptr);
+    else lv_sysmon_hide_performance(nullptr);
+#endif
+    if (p->diagnostics.touches && !s.touches_hooked) {
+        for (lv_indev_t* i = lv_indev_get_next(nullptr); i; i = lv_indev_get_next(i))
+            if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, on_touch, LV_EVENT_PRESSED, nullptr);
+        s.touches_hooked = true;
+    }
+}
+
 void tick_progress(lv_timer_t*) {
     auto& s = shell();
+    tick_ambient();
     if (!s.state.playing()) return;
     ++s.state.elapsed_s;
     screen(s.current).refresh(Topic::Progress);
@@ -249,6 +306,117 @@ std::string back_label() {
 }
 
 void set_detail_item(const core::MediaItem& item) { shell().detail = item; }
+SettingsPage settings_page() { return shell().page; }
+
+void open_settings_page(SettingsPage page) {
+    shell().page = page;
+    if (shell().current == ScreenId::SettingsPage) return show(ScreenId::SettingsPage);
+    open(ScreenId::SettingsPage);
+}
+
+std::string clock_text(int minutes) {
+    char buf[8];
+    snprintf(buf, sizeof buf, "%02d:%02d", (minutes / 60) % 24, minutes % 60);
+    return buf;
+}
+
+lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
+    lv_obj_t* c = kit::column(parent, 12);
+    lv_obj_set_width(c, lv_pct(100));
+    lv_obj_set_style_pad_all(c, 28, 0);
+    lv_obj_set_style_radius(c, theme::kRadiusCard, 0);
+    lv_obj_set_style_bg_color(c, theme::surface(), 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    if (!title.empty()) kit::text(c, title, theme::h2(), theme::text());
+    return c;
+}
+
+lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
+                  bool chevron) {
+    lv_obj_t* r = kit::row(parent, 16);
+    lv_obj_set_size(r, lv_pct(100), sub.empty() ? 64 : 80);
+    lv_obj_set_style_pad_hor(r, 16, 0);
+    lv_obj_set_style_radius(r, theme::kRadiusRow, 0);
+    lv_obj_set_style_bg_color(r, theme::elevated(), 0);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(r, lv_color_mix(lv_color_white(), theme::elevated(), 31), LV_STATE_PRESSED);
+    if (glyph) kit::icon(r, glyph, 28, theme::text2());
+    lv_obj_t* col = kit::column(r, 4);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_width(col, 1);
+    kit::text(col, title, theme::body(), theme::text());
+    if (!sub.empty()) kit::text(col, sub, theme::meta(), theme::text2());
+    if (chevron) kit::icon(r, icon::chevron_right, 28, theme::text3());
+    kit::on_click(r, std::move(action));
+    return r;
+}
+
+lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& body) {
+    lv_obj_t* b = kit::row(parent, 20);
+    lv_obj_set_width(b, lv_pct(100));
+    lv_obj_set_style_pad_all(b, 20, 0);
+    lv_obj_set_style_radius(b, 16, 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(0x2A2416), 0);
+    lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(b, 1, 0);
+    lv_obj_set_style_border_color(b, lv_color_hex(0x5A4A22), 0);
+    kit::icon(b, icon::warning, 32, theme::warning());
+    lv_obj_t* col = kit::column(b, 4);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_width(col, 1);
+    kit::text(col, title, theme::body(), theme::text());
+    kit::text(col, body, theme::meta(), theme::text2(), true);
+    return b;
+}
+
+void show_ambient() {
+    auto& s = shell();
+    if (s.ambient) return;
+    kit::close_sheets();
+    const app::PanelView* p = s.state.panel.get();
+    bool clock = !p || p->display.clock_when_dimmed;
+    bool night = p && p->night_now;
+    lv_obj_t* a = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(a);
+    lv_obj_set_size(a, theme::kScreenW, theme::kScreenH);
+    lv_obj_set_style_bg_color(a, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(a, LV_OPA_COVER, 0);
+    lv_obj_set_flex_flow(a, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(a, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(a, 12, 0);
+    lv_obj_add_flag(a, LV_OBJ_FLAG_CLICKABLE);  // swallows the waking tap
+    s.ambient = a;
+    s.ambient_clock = nullptr;
+    lv_color_t fg = night ? theme::text3() : theme::text();
+    if (clock) {
+        std::time_t t = std::time(nullptr);
+        std::tm* lt = std::localtime(&t);
+        s.ambient_clock = kit::text(a, clock_text(lt->tm_hour * 60 + lt->tm_min), theme::clock(), fg);
+        std::string date = std::string(tr(static_cast<i18n::Str>(static_cast<int>(i18n::Str::day_0) + lt->tm_wday))) + " " +
+                           std::to_string(lt->tm_mday) + " " +
+                           tr(static_cast<i18n::Str>(static_cast<int>(i18n::Str::month_1) + lt->tm_mon));
+        kit::text(a, date, theme::h2(), night ? theme::text3() : theme::text2());
+        if (auto item = s.state.now_playing(); item && s.state.playing()) {
+            lv_obj_t* np = kit::row(a, 12);
+            lv_obj_set_style_pad_top(np, 48, 0);
+            kit::icon(np, icon::volume, 22, theme::text3());
+            const core::PlayerState* pl = s.state.selected();
+            kit::text(np, item->name + " · " + kit::subtitle(*item) + (pl ? " · " + pl->name : ""), theme::lead(), theme::text3());
+        }
+    }
+    lv_obj_t* hint = kit::text(a, tr(i18n::Str::ambient_tap), theme::label(), lv_color_hex(0x4A5260));
+    lv_obj_add_flag(hint, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -32);
+    send(app::cmd::SetDimmed{true});
+    kit::on_click(a, [] {
+        auto& sh = shell();
+        lv_obj_delete_async(sh.ambient);
+        sh.ambient = nullptr;
+        sh.ambient_clock = nullptr;
+        lv_display_trigger_activity(nullptr);
+        send(app::cmd::SetDimmed{false});
+    });
+}
 const core::MediaItem& detail_item() { return shell().detail; }
 
 void open_detail(const core::MediaItem& item) {
@@ -290,9 +458,12 @@ void start(Send send_fn) {
     s.screens.push_back(make_settings());
     s.screens.push_back(make_now_playing());
     s.screens.push_back(make_detail());
+    s.screens.push_back(make_settings_page());
+    s.screens.push_back(make_setup());
+    s.screens.push_back(make_boot());
     build_all();
     lv_timer_create(tick_progress, 1000, nullptr);
-    show(ScreenId::Home);
+    show(ScreenId::Boot);  // until connected (or the setup flow takes over)
 }
 
 void apply(app::Update update) {
@@ -302,7 +473,21 @@ void apply(app::Update update) {
         bool came_up = c->state == backend::Connection::Connected && s.state.connection.state != backend::Connection::Connected;
         s.state.connection = *c;
         topic = Topic::Connection;
-        if (came_up) screen(s.current).on_open();  // (re)connected: reload what the screen shows
+        if (came_up) {
+            s.state.ever_connected = true;
+            if (s.current == ScreenId::Boot) return open(ScreenId::Home);
+            screen(s.current).on_open();  // (re)connected: reload what the screen shows
+        }
+    } else if (auto* sv = std::get_if<std::shared_ptr<const app::SetupView>>(&update)) {
+        s.state.setup = *sv;
+        bool setting_up = (*sv)->step != app::SetupStep::Finished;
+        if (setting_up && s.current != ScreenId::Setup) return show(ScreenId::Setup);
+        if (!setting_up && s.current == ScreenId::Setup) return open(s.state.connected() ? ScreenId::Home : ScreenId::Boot);
+        topic = Topic::Setup;
+    } else if (auto* pv = std::get_if<std::shared_ptr<const app::PanelView>>(&update)) {
+        s.state.panel = *pv;
+        apply_diagnostics();
+        topic = Topic::Panel;
     } else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&update)) {
         s.state.players = *p;
         topic = Topic::Players;

@@ -33,6 +33,8 @@ public:
     void on_text(std::string_view text);
     void on_open();
     void on_closed();  // fails every pending request with error_code "disconnected"
+    void set_token(std::string token) { token_ = std::move(token); }
+    void set_expected_server_id(std::string id) { expected_server_id_ = std::move(id); }
 
     backend::Connection connection() const { return connection_; }
     const backend::ServerInfo& server_info() const { return info_; }

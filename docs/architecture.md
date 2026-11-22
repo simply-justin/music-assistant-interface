@@ -60,6 +60,7 @@ websocket task ──text frame──► g_jobs (posted as a job) ──► ma::
 | PC test app, live | the **same core code** against your real Music Assistant server | `test/host/build/panel_cli test/host/server.env` |
 | Device build | it compiles for the ESP32-P4 | `idf.py build` |
 | **Simulator** | the real screens in a 1280×800 window (X11/WSLg), mock or live | `test/sim/build/music_panel_sim [--live test/host/server.env]` |
+| Setup flow | first-time setup from the start (fake Wi-Fi password: `music`) | `music_panel_sim --setup [--live test/host/server.env]` |
 | Screenshots | every screen rendered headless to `.ppm` (review without a display) | `music_panel_sim --shots <dir>` |
 
 `test/host/server.env` (git-ignored, yours only):
@@ -79,6 +80,17 @@ cmake -S test/sim  -B test/sim/build  && cmake --build test/sim/build  -j   # fe
 
 In the simulator the mouse is your finger; everything you tap sends the same commands the panel
 will. With `--live`, taps on Play/Add/Volume really play on your speakers.
+
+## Platform seam
+
+`app::Platform` (`components/app/include/app/platform.hpp`) is everything that differs between
+the board and a PC: Wi-Fi scan/join, finding the server, the pairing page that receives the token
+from a phone, backlight, system info, local time, restart. The simulator and tests use
+`test/host/fake_platform.hpp`; `main/main.cpp` has `BoardPlatform`, which reports Wi-Fi/discovery/
+pairing as "not available" until the board package lands (Phase 2b).
+
+First-time setup (`features/setup.cpp`) and panel settings (`features/panel.cpp`) only talk to this
+interface, so they are fully tested on the PC (`test_setup_flow`, `test_panel_brightness`).
 
 ## UI rules (how to add a screen)
 
@@ -112,6 +124,10 @@ idf.py build flash monitor
 ## Known limits
 
 - Not checked live yet: commands that change playback (play, add, clear, volume). That needs your OK, because they play on your speakers.
+- On the board, Wi-Fi join, server discovery (mDNS), the token pairing page and backlight PWM are
+  stubs until Phase 2b; set the server/token in menuconfig meanwhile.
+- The playback-error banner shows when Music Assistant marks the current queue item unavailable;
+  a richer error signal is open question 2.
 - Reconnect uses a fixed 3 s retry, not exponential backoff (marked shortcut).
 - Wi-Fi (via the C6), PSRAM, flash size, partitions/OTA and chip revision come from Waveshare's examples once the board is here.
 - UI lists are capped plain lists (200–500 rows), not yet recycled/virtualized; artwork is a flat

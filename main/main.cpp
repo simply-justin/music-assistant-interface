@@ -7,7 +7,12 @@
 #include "app/app.hpp"
 #include "backend/ma_client.hpp"
 #include "backend/mock_backend.hpp"
+#include <ctime>
+
+#include "esp_app_desc.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -58,19 +63,57 @@ public:
         if (nvs_set_str(h_, key.c_str(), value.c_str()) == ESP_OK) nvs_commit(h_);
         else ESP_LOGE(TAG, "could not save setting %s", key.c_str());
     }
+    void erase_all() override {
+        nvs_erase_all(h_);
+        nvs_commit(h_);
+    }
 
 private:
     nvs_handle_t h_{};
 };
 
+// shortcut: Wi-Fi (ESP32-C6 via esp_wifi_remote), mDNS discovery, the pairing web page and the
+// backlight arrive with the board package in Phase 2b; until then they report "not available".
+class BoardPlatform : public app::Platform {
+public:
+    void wifi_scan(std::function<void(std::vector<app::WifiNetwork>)> done) override { done({}); }
+    void wifi_join(const std::string&, const std::string&, std::function<void(app::WifiResult)> done) override {
+        done(app::WifiResult::Failed);
+    }
+    app::WifiStatus wifi_status() override { return {}; }
+    void discover_servers(std::function<void(std::vector<app::ServerCandidate>)> done) override { done({}); }
+    std::string pairing_start(std::function<void(std::string)>) override { return {}; }
+    void pairing_stop() override {}
+    void set_brightness(int percent) override { ESP_LOGI(TAG, "brightness %d %%", percent); }
+    app::SystemInfo system_info() override {
+        return {esp_app_get_description()->version, static_cast<uint32_t>(esp_timer_get_time() / 1000000),
+                static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+                static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024)};
+    }
+    int local_minutes() override {
+        std::time_t t = std::time(nullptr);  // shortcut: needs SNTP + timezone (Phase 2b) to be local time
+        std::tm lt{};
+        localtime_r(&t, &lt);
+        return lt.tm_hour * 60 + lt.tm_min;
+    }
+    void restart() override { esp_restart(); }
+};
+
 void core_task(void*) {
     static NvsSettings settings;
+    static BoardPlatform platform;
 #if CONFIG_PANEL_BACKEND_MA
-    static ma::Client backend(CONFIG_PANEL_MA_URL, CONFIG_PANEL_MA_TOKEN, settings.get("server_id"), post_job);
+    // Development shortcut until the Setup screens run on the board: seed from menuconfig.
+    if (settings.get("server_url").empty() && CONFIG_PANEL_MA_URL[0]) {
+        settings.set("server_url", CONFIG_PANEL_MA_URL);
+        settings.set("token", CONFIG_PANEL_MA_TOKEN);
+        settings.set("setup_done", "1");
+    }
+    static ma::Client backend("", "", settings.get("server_id"), post_job);  // App configures it
 #else
     static backend::MockBackend backend;
 #endif
-    static app::App app(backend, settings, publish);
+    static app::App app(backend, settings, platform, publish);
     app.start();
     for (;;) {
         Job* job = nullptr;

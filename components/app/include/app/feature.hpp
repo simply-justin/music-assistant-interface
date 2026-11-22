@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "app/commands.hpp"
+#include "app/platform.hpp"
 #include "app/settings.hpp"
 #include "app/updates.hpp"
 #include "backend/backend.hpp"
@@ -19,6 +20,7 @@ namespace app {
 struct Context {
     backend::Backend& backend;
     Settings& settings;
+    Platform& platform;
     std::function<void(Update)> publish;     // to the UI
     std::function<void(Command)> dispatch;   // to every feature
     uint32_t now_ms = 0;
@@ -35,6 +37,7 @@ class Feature {
 public:
     virtual ~Feature() = default;
     virtual void on_connected() {}                         // after (re)connect: full re-sync
+    virtual void on_connection(backend::Connection) {}     // every connection state change
     virtual void on_command(const Command&) {}
     virtual void on_event(const backend::Event&) {}
     virtual void tick() {}                                 // every core loop, ctx.now_ms is fresh

@@ -12,7 +12,7 @@
 namespace ui {
 
 // What changed, so a screen can skip work (e.g. a progress tick must not rebuild lists).
-enum class Topic : uint8_t { All, Connection, Players, Queue, Progress, Search, Playlists, Browse };
+enum class Topic : uint8_t { All, Connection, Players, Queue, Progress, Search, Playlists, Browse, Setup, Panel };
 
 // Latest snapshot of every core view.
 struct State {
@@ -22,11 +22,15 @@ struct State {
     std::shared_ptr<const core::SearchView> search;
     std::shared_ptr<const app::PlaylistsView> playlists;
     std::map<std::string, std::shared_ptr<const app::BrowseView>> lists;  // key: browse_key()
+    std::shared_ptr<const app::SetupView> setup;
+    std::shared_ptr<const app::PanelView> panel;
+    bool ever_connected = false;
     uint32_t elapsed_s = 0;  // local 1 Hz clock, re-synced from the queue
 
     const core::PlayerState* selected() const;
     std::optional<core::MediaItem> now_playing() const;  // current queue item's media
     bool playing() const;
+    bool connected() const { return connection.state == backend::Connection::Connected; }
     const app::BrowseView* list(app::cmd::BrowseKind kind, const std::string& of_uri = "") const;
 };
 
@@ -55,6 +59,10 @@ std::unique_ptr<Screen> make_queue();
 std::unique_ptr<Screen> make_settings();
 std::unique_ptr<Screen> make_now_playing();
 std::unique_ptr<Screen> make_detail();
+std::unique_ptr<Screen> make_settings_page();
+std::unique_ptr<Screen> make_setup();
+std::unique_ptr<Screen> make_boot();
+SettingsPage settings_page();
 
 // Navigation for screens.
 void back();
@@ -70,6 +78,14 @@ void confirm(const std::string& title, const std::string& body, const std::strin
 
 // Shared bits used by several screens.
 std::string songs(size_t count);  // "1 song", "14 songs" / "1 nummer", "14 nummers"
+std::string clock_text(int minutes);  // 22:00
+// A card-like rounded block on `surface` (Settings, setup lists).
+lv_obj_t* card(lv_obj_t* parent, const std::string& title = {});
+// A tappable settings/list row: icon, title, optional subtitle, optional chevron.
+lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
+                  bool chevron = true);
+// Warning banner (offline, provider down, playback error).
+lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& body);
 lv_obj_t* speaker_chip(lv_obj_t* parent);
 void play(const core::MediaItem& item);  // Play now (tap on a row/card that plays)
 void open_item(const core::MediaItem& item);  // tap: tracks/radio play, others open their detail

@@ -23,6 +23,8 @@ public:
     void set_listener(Listener l) override { session_.set_listener(std::move(l)); }
     void start() override;
     void request(backend::Request req, Done done) override { session_.request(std::move(req), std::move(done)); }
+    void configure(const std::string& url, const std::string& token) override;
+    void reconnect() override;
 
 private:
     static void on_ws_event(void* arg, const char* base, int32_t id, void* data);

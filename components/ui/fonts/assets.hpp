@@ -69,6 +69,7 @@ inline constexpr const char* edit = "\xEE\x8E\xB4";
 inline constexpr const char* playlist_add = "\xEE\x8B\xB8";
 inline constexpr const char* artist = "\xEE\x93\x82";
 inline constexpr const char* album = "\xEE\xB2\xAC";
+inline constexpr const char* language = "\xEE\x8A\x88";
 }  // namespace icon
 
 }  // namespace ui
