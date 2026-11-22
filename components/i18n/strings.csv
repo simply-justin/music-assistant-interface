@@ -260,7 +260,6 @@ side_playing,Playing,Speelt
 side_idle,Ready,Klaar
 side_playlists,Your playlists,Je afspeellijsten
 home_music,Music,Muziek
-home_now_on,Now on {},Nu op {}
 home_paused,Paused,Gepauzeerd
 home_no_favourites,"Tap the heart on songs, albums, playlists or stations and they appear here for one-tap play.","Tik op het hartje bij nummers, albums, afspeellijsten of zenders en ze verschijnen hier om met één tik te spelen."
 home_stations,Your stations,Je zenders

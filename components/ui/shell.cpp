@@ -229,7 +229,7 @@ void refresh_bar() {
             lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
         }
         lv_obj_t* prog = kit::row(mid, 10);
-        lv_obj_set_width(prog, 440);
+        lv_obj_set_width(prog, 480);
         lv_obj_set_style_opa(prog, LV_OPA_40, 0);
         kit::text(prog, "0:00", theme::label(), theme::text3());
         lv_obj_t* track = kit::row(prog, 0);
@@ -242,7 +242,7 @@ void refresh_bar() {
     }
     if (item && !radio && item->duration_s) {
         lv_obj_t* prog = kit::row(mid, 10);
-        lv_obj_set_width(prog, 440);
+        lv_obj_set_width(prog, 480);
         s.elapsed = kit::text(prog, duration(s.state.elapsed_s), theme::label(), theme::text3());
         s.progress = lv_bar_create(prog);
         lv_obj_set_flex_grow(s.progress, 1);
@@ -256,31 +256,17 @@ void refresh_bar() {
     }
 
     lv_obj_t* right = kit::row(s.bar, 8);
-    lv_obj_set_width(right, 400);
+    lv_obj_set_width(right, 320);
     lv_obj_set_style_pad_right(right, 12, 0);  // room for the volume knob at 100 %
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); }, 48, 22, false, theme::text2());
-    // Speaker (Spotify-style "playing on"): icon + name; tap = pick or group speakers.
-    lv_obj_t* spk = kit::row(right, 8);
-    lv_obj_set_height(spk, 40);
-    lv_obj_set_ext_click_area(spk, 8);
-    lv_obj_set_style_pad_hor(spk, 12, 0);
-    lv_obj_set_style_radius(spk, theme::r_control(), 0);
-    lv_obj_set_style_border_width(spk, 1, 0);
-    lv_obj_set_style_border_color(spk, theme::border(), 0);
-    lv_obj_set_style_bg_color(spk, theme::surface(), LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(spk, LV_OPA_COVER, LV_STATE_PRESSED);
-    lv_color_t spk_fg = s.state.playing() ? theme::accent() : theme::text2();
-    if (s.state.playing()) kit::equalizer(spk, spk_fg, true);
-    else kit::icon(spk, icon::speaker, 20, spk_fg);
-    lv_obj_t* spk_name = kit::text(spk, p ? p->name : tr(i18n::Str::speaker_none), theme::label(), spk_fg);
-    lv_obj_set_style_max_width(spk_name, 120, 0);
-    kit::on_click(spk, [] { open_speakers(); });
+    // Speaker (Spotify-style): icon only, in the accent while it plays; tap = pick or group speakers.
+    kit::icon_button(right, icon::speaker, [] { open_speakers(); }, 48, 22, false, s.state.playing() ? theme::accent() : theme::text2());
     kit::icon_button(right, icon::volume, [] { open_volume(); }, 48, 22, false, theme::text2());
     if (p && p->can_set_volume) {
         std::string id = p->player_id;
         lv_obj_t* vol = kit::slider(right, p->volume_level, [id](int v) { send(app::cmd::SetVolume{id, v}); }, theme::text2());
-        lv_obj_set_width(vol, 112);
+        lv_obj_set_width(vol, 120);
     }
 }
 
