@@ -38,9 +38,18 @@ lv_obj_t* play_button(lv_obj_t* parent, bool playing, Action action, int32_t siz
 lv_obj_t* chip(lv_obj_t* parent, const char* glyph, const std::string& label, bool selected, Action action);
 lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action);
 
-lv_obj_t* art(lv_obj_t* parent, const core::MediaItem& item, int32_t size, int32_t radius);
+// Artwork box: placeholder colour (+ type icon for radio) until the real image arrives.
+// `bg`: the colour behind it, used to pre-round the corners.
+lv_obj_t* art(lv_obj_t* parent, const core::MediaItem& item, int32_t size, int32_t radius, lv_color_t bg = theme::bg(),
+              std::function<void(uint32_t)> on_ready = {});
 lv_obj_t* badge(lv_obj_t* parent, const std::string& provider);  // 20 px grey letter
 lv_obj_t* tag(lv_obj_t* parent, const std::string& s, lv_color_t colour = theme::text2());
+
+// Long list with fixed-height rows: only the rows in view (+ a few spare) exist as LVGL objects;
+// they are created/deleted while scrolling. `make` builds row `i` inside the given parent.
+// Fill the parent (flex-grow or a fixed height): the list scrolls itself.
+lv_obj_t* virtual_list(lv_obj_t* parent, size_t count, int32_t row_height, int32_t gap,
+                       std::function<lv_obj_t*(lv_obj_t* list, size_t index)> make);
 
 struct RowOptions {
     int32_t height = 72;

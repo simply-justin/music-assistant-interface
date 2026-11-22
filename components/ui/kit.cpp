@@ -1,5 +1,8 @@
 #include "kit.hpp"
 
+#include <map>
+
+#include "artwork.hpp"
 #include "i18n/i18n.hpp"
 #include "text.hpp"
 
@@ -88,6 +91,66 @@ lv_obj_t* scroll_column(lv_obj_t* parent, int32_t gap) {
     lv_obj_set_scroll_dir(o, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(o, LV_SCROLLBAR_MODE_OFF);
     return o;
+}
+
+namespace {
+struct VList {
+    size_t count;
+    int32_t step;  // row height + gap
+    std::function<lv_obj_t*(lv_obj_t*, size_t)> make;
+    std::map<size_t, lv_obj_t*> rows;
+};
+constexpr size_t kSpare = 3;  // rows kept above/below the viewport
+
+void vlist_update(lv_obj_t* list) {
+    auto* v = static_cast<VList*>(lv_obj_get_user_data(list));
+    int32_t h = lv_obj_get_height(list);
+    if (h <= 0 || v->count == 0) return;
+    int32_t y = lv_obj_get_scroll_y(list);
+    size_t first = static_cast<size_t>(std::max<int32_t>(0, y / v->step)) ;
+    first = first > kSpare ? first - kSpare : 0;
+    size_t last = std::min(v->count, static_cast<size_t>((y + h) / v->step) + 1 + kSpare);
+    for (auto it = v->rows.begin(); it != v->rows.end();) {
+        if (it->first < first || it->first >= last) {
+            lv_obj_delete(it->second);
+            it = v->rows.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (size_t i = first; i < last; ++i) {
+        if (v->rows.count(i)) continue;
+        lv_obj_t* row = v->make(list, i);
+        lv_obj_set_pos(row, 0, static_cast<int32_t>(i) * v->step);
+        v->rows[i] = row;
+    }
+}
+}  // namespace
+
+lv_obj_t* virtual_list(lv_obj_t* parent, size_t count, int32_t row_height, int32_t gap,
+                       std::function<lv_obj_t*(lv_obj_t*, size_t)> make) {
+    lv_obj_t* list = lv_obj_create(parent);
+    remove_style(list);
+    lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_width(list, lv_pct(100));
+    lv_obj_set_flex_grow(list, 1);
+    // An invisible 1 px marker at the end gives the list its full scroll height.
+    lv_obj_t* end = lv_obj_create(list);
+    remove_style(end);
+    lv_obj_set_size(end, 1, 1);
+    lv_obj_set_pos(end, 0, static_cast<int32_t>(count) * (row_height + gap) + 24);
+    lv_obj_set_user_data(list, new VList{count, row_height + gap, std::move(make), {}});
+    lv_obj_add_event_cb(list, [](lv_event_t* e) { vlist_update(static_cast<lv_obj_t*>(lv_event_get_current_target(e))); },
+                        LV_EVENT_SCROLL, nullptr);
+    lv_obj_add_event_cb(list, [](lv_event_t* e) { vlist_update(static_cast<lv_obj_t*>(lv_event_get_current_target(e))); },
+                        LV_EVENT_SIZE_CHANGED, nullptr);
+    lv_obj_add_event_cb(list, [](lv_event_t* e) {
+        auto* l = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+        delete static_cast<VList*>(lv_obj_get_user_data(l));
+    }, LV_EVENT_DELETE, nullptr);
+    return list;
 }
 
 lv_obj_t* text(lv_obj_t* parent, const std::string& s, const lv_font_t* font, lv_color_t colour, bool wrap) {
@@ -196,16 +259,17 @@ lv_obj_t* back_chip(lv_obj_t* parent, const std::string& label, Action action) {
     return c;
 }
 
-lv_obj_t* art(lv_obj_t* parent, const core::MediaItem& item, int32_t size, int32_t radius) {
+lv_obj_t* art(lv_obj_t* parent, const core::MediaItem& item, int32_t size, int32_t radius, lv_color_t bg,
+              std::function<void(uint32_t)> on_ready) {
     lv_obj_t* a = lv_obj_create(parent);
     remove_style(a);
     lv_obj_set_size(a, size, size);
-    lv_obj_set_style_radius(a, item.type == core::MediaType::Artist ? LV_RADIUS_CIRCLE : radius, 0);
+    int32_t r = item.type == core::MediaType::Artist ? size / 2 : radius;
+    lv_obj_set_style_radius(a, r, 0);
     lv_obj_set_style_bg_opa(a, LV_OPA_COVER, 0);
     lv_obj_set_style_bg_color(a, theme::art_colour(item.uri.empty() ? item.name.c_str() : item.uri.c_str()), 0);
-    // shortcut: flat placeholder; the artwork pipeline (HW JPEG + LRU cache) replaces this in Phase 4.
-    const char* glyph = item.type == core::MediaType::Radio ? icon::radio : item.type == core::MediaType::Artist ? nullptr : nullptr;
-    if (glyph) lv_obj_center(icon(a, glyph, size >= 120 ? 48 : 22, lv_color_hex(0xFFFFFF)));
+    if (item.type == core::MediaType::Radio) lv_obj_center(icon(a, icon::radio, size >= 120 ? 48 : 22, lv_color_hex(0xFFFFFF)));
+    art::attach(a, item, size, size, r, bg, std::move(on_ready));
     return a;
 }
 
@@ -266,7 +330,7 @@ lv_obj_t* media_row(lv_obj_t* parent, const core::MediaItem& item, const RowOpti
     lv_obj_set_style_radius(r, theme::kRadiusRow, 0);
     pressable(r, opt.playing ? theme::surface() : theme::bg());
     lv_obj_set_style_bg_opa(r, opt.playing ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
-    art(r, item, opt.height - 20, 8);
+    art(r, item, opt.height - 20, 8, opt.playing ? theme::surface() : theme::bg());
     lv_obj_t* col = column(r, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);  // let flex-grow decide; enables "…" clipping
@@ -314,7 +378,7 @@ lv_obj_t* favourite_tile(lv_obj_t* parent, const core::MediaItem& item, Action o
     lv_obj_set_style_bg_opa(t, LV_OPA_COVER, 0);
     pressable(t, theme::surface());
     lv_obj_set_style_pad_right(t, 16, 0);
-    art(t, item, 80, 0);
+    art(t, item, 80, 0, theme::surface());
     lv_obj_t* col = column(t, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);

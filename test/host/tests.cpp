@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "app/app.hpp"
+#include "backend/backoff.hpp"
 #include "backend/ma_commands.hpp"
 #include "backend/ma_session.hpp"
 #include "backend/mock_backend.hpp"
@@ -11,6 +12,7 @@
 #include "core/repeat_guard.hpp"
 #include "core/search.hpp"
 #include "core/text.hpp"
+#include "img/artwork.hpp"
 #include "i18n/i18n.hpp"
 #include "fake_platform.hpp"
 #include "text.hpp"
@@ -241,6 +243,8 @@ static void test_parse() {
     CHECK(req.command == "music/search");
     CHECK(cJSON_GetArraySize(cJSON_GetObjectItem(req.args.get(), "providers")) == 1);
     CHECK(!cJSON_GetObjectItem(ma::cmd::search("x", SearchStage::Full, 10).args.get(), "providers"));
+    auto rm = ma::cmd::playlist_remove_tracks("7", {0});  // first song → MA position 1
+    CHECK(cJSON_GetArrayItem(cJSON_GetObjectItem(rm.args.get(), "positions_to_remove"), 0)->valueint == 1);
 }
 
 static void test_i18n() {
@@ -300,16 +304,48 @@ static void test_app_with_mock() {
         if (auto* t = std::get_if<app::Toast>(&u)) toast = t;
     CHECK(toast && toast->action && toast->text == "Viva La Vida is already in the queue");
 
+    // Clear up next: the current song (index 0 in the mock) stays, the rest goes.
+    a.handle(app::cmd::ClearUpNext{});
+    run_until(3100);
+    {
+        std::shared_ptr<const core::QueueState> cq;
+        for (auto& u : updates)
+            if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) cq = *x;
+        CHECK(cq && cq->items.size() == 1 && cq->items[0].name == "Viva La Vida");
+    }
+
+    // Undo: adding a new song offers Undo, which removes exactly that queue item.
+    core::MediaItem fresh;
+    fresh.type = core::MediaType::Track;
+    fresh.name = "Let It Happen";
+    fresh.uri = "library://track/t5";
+    updates.clear();
+    a.handle(app::cmd::AddToQueue{fresh});
+    run_until(3250);
+    const app::Toast* undo = nullptr;
+    for (auto& u : updates)
+        if (auto* t = std::get_if<app::Toast>(&u)) undo = t;
+    CHECK(undo && undo->action_label == "Undo" && std::holds_alternative<app::cmd::RemoveFromQueue>(*undo->action));
+    std::shared_ptr<const core::QueueState> q;
+    for (auto& u : updates)
+        if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
+    size_t before = q ? q->items.size() : 0;
+    if (undo) a.handle(*undo->action);
+    run_until(3400);
+    for (auto& u : updates)
+        if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
+    CHECK(q && q->items.size() + 1 == before);
+
     // Volume is clamped and reflected.
     a.handle(app::cmd::SetVolume{"living", 140});
-    run_until(3200);
+    run_until(3500);
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
     CHECK(players && players->players[0].volume_level == 100);
 
     // Playlists: list (editable flag parsed), add a song, create one.
     a.handle(app::cmd::LoadPlaylists{});
-    run_until(3400);
+    run_until(3700);
     std::shared_ptr<const app::PlaylistsView> pls;
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlaylistsView>>(&u)) pls = *p;
@@ -318,7 +354,7 @@ static void test_app_with_mock() {
     updates.clear();
     a.handle(app::cmd::AddToPlaylist{pls->playlists[0], viva});
     a.handle(app::cmd::CreatePlaylist{"Kitchen songs", viva});
-    run_until(3800);
+    run_until(4100);
     std::vector<std::string> toasts;
     for (auto& u : updates)
         if (auto* t = std::get_if<app::Toast>(&u)) toasts.push_back(t->text);
@@ -406,6 +442,40 @@ static void test_panel_brightness() {
     CHECK(platform.restarted && settings.get("brightness").empty());
 }
 
+static void test_artwork() {
+    CHECK(img::proxy_size(52) == 80 && img::proxy_size(160) == 160 && img::proxy_size(224) == 256 && img::proxy_size(520) == 512 && img::proxy_size(600) == 1024);
+    core::Image im{"p", "spotify", "abc", true};
+    CHECK(img::proxy_url("http://h:8095", im, 52) == "http://h:8095/imageproxy/abc?size=80");
+    CHECK(img::proxy_url("http://h:8095", core::Image{}, 52).empty());
+    // 4×4 red → 2×2, average red, corners rounded to the background.
+    std::vector<uint8_t> red(4 * 4 * 3, 0);
+    for (size_t i = 0; i < red.size(); i += 3) red[i] = 255;
+    auto b = img::scale(red.data(), 4, 4, 2, 2, 0, 0);
+    CHECK(b->w == 2 && b->rgb565[0] == 0xF800 && b->average == 0xFF0000);
+    auto r = img::scale(red.data(), 4, 4, 16, 16, 6, 0x000000);
+    CHECK(r->rgb565[0] == 0 && r->rgb565[15] == 0 && r->rgb565[8 * 16 + 8] == 0xF800);
+    // Art background: bright saturated red → dark, muted red within L ≤ 16 %, S ≤ 45 %.
+    uint32_t dark = img::art_background(0xFF0000);
+    CHECK((dark >> 16 & 0xFF) > (dark & 0xFF) && (dark >> 16 & 0xFF) <= 0x3B && img::art_background(0x101010) == 0x101010);
+    // LRU: over budget evicts the oldest unpinned entry.
+    img::Cache cache(3 * (b->bytes()));
+    cache.put("a", b);
+    cache.put("b", img::scale(red.data(), 4, 4, 2, 2, 0, 0));
+    cache.pin("a");
+    cache.put("c", img::scale(red.data(), 4, 4, 2, 2, 0, 0));
+    cache.put("d", img::scale(red.data(), 4, 4, 2, 2, 0, 0));
+    CHECK(cache.get("a") && !cache.get("b") && cache.get("c") && cache.get("d"));
+}
+
+static void test_backoff() {
+    backend::Backoff b;
+    CHECK(b.next() == 1000 && b.next() == 2000 && b.next() == 4000);
+    for (int i = 0; i < 10; ++i) b.next();
+    CHECK(b.next() == 30000);
+    b.reset();
+    CHECK(b.next() == 1000);
+}
+
 static void test_repeat_guard() {
     RepeatGuard g;
     CHECK(g.allow("a", 0));
@@ -427,6 +497,8 @@ int main() {
     test_display_text();
     test_setup_flow();
     test_panel_brightness();
+    test_artwork();
+    test_backoff();
     std::printf(g_failed ? "%d check(s) FAILED\n" : "all checks passed\n", g_failed);
     return g_failed ? 1 : 0;
 }

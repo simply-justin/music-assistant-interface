@@ -48,9 +48,7 @@ void Client::start() {
     esp_websocket_client_config_t cfg = {};
     cfg.uri = url_.c_str();
     cfg.buffer_size = 4096;
-    // shortcut: fixed 3 s auto-reconnect, not exponential backoff; upgrade in Phase 4 if the
-    // server gets hammered after an outage.
-    cfg.reconnect_timeout_ms = 3000;
+    cfg.reconnect_timeout_ms = static_cast<int>(backend::Backoff::kFirstMs);  // grows on each failure, see on_ws_event
     cfg.network_timeout_ms = 10000;
     ws_ = esp_websocket_client_init(&cfg);
     esp_websocket_register_events(ws_, WEBSOCKET_EVENT_ANY, &Client::on_ws_event, this);
@@ -63,13 +61,21 @@ void Client::on_ws_event(void* arg, const char*, int32_t id, void* event_data) {
     switch (id) {
         case WEBSOCKET_EVENT_CONNECTED:
             ESP_LOGI(TAG, "connected");
-            self->post_([self] { self->session_.on_open(); });
+            self->post_([self] {
+                self->backoff_.reset();
+                esp_websocket_client_set_reconnect_timeout(self->ws_, static_cast<int>(backend::Backoff::kFirstMs));
+                self->session_.on_open();
+            });
             break;
         case WEBSOCKET_EVENT_DISCONNECTED:
         case WEBSOCKET_EVENT_CLOSED:
             ESP_LOGW(TAG, "disconnected");
             self->rx_.clear();
-            self->post_([self] { self->session_.on_closed(); });
+            // Not from this (websocket) task: setting the timeout takes the client's lock.
+            self->post_([self] {
+                esp_websocket_client_set_reconnect_timeout(self->ws_, static_cast<int>(self->backoff_.next()));
+                self->session_.on_closed();
+            });
             break;
         case WEBSOCKET_EVENT_DATA: {
             if (d->op_code != 0x1 && d->op_code != 0x0) break;  // text + continuation only

@@ -209,10 +209,20 @@ Response MockBackend::handle(const Request& req) {
         }
     } else if (c == "music/recently_played_items" || c == "music/playlists/playlist_tracks" ||
                c == "music/albums/album_tracks" || c == "music/artists/artist_tracks") {
+        // Playlists are long (~400 songs) so the windowed lists get exercised.
+        int copies = c == "music/playlists/playlist_tracks" ? 60 : 1;
         r.result.reset(cJSON_CreateArray());
-        const cJSON* item;
-        cJSON_ArrayForEach(item, catalog_.get()) {
-            if (json_str(item, "media_type") == "track") cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
+        for (int n = 0; n < copies; ++n) {
+            const cJSON* item;
+            cJSON_ArrayForEach(item, catalog_.get()) {
+                if (json_str(item, "media_type") != "track") continue;
+                cJSON* copy = cJSON_Duplicate(item, true);
+                if (n) {
+                    std::string uri = json_str(item, "uri") + "#" + std::to_string(n);
+                    cJSON_ReplaceItemInObjectCaseSensitive(copy, "uri", cJSON_CreateString(uri.c_str()));
+                }
+                cJSON_AddItemToArray(r.result.get(), copy);
+            }
         }
     } else if (c == "providers") {
         r.result.reset(cJSON_Parse(R"json([
@@ -235,8 +245,8 @@ Response MockBackend::handle(const Request& req) {
         emit("queue_items_updated", json_str(args, "queue_id"), nullptr);
         emit("queue_updated", json_str(args, "queue_id"), queue_object(json_str(args, "queue_id")));
     } else if (c == "player_queues/clear") {
-        // Mirrors the decision: the current (first) item keeps playing.
-        while (cJSON_GetArraySize(queue_.get()) > 1) cJSON_DeleteItemFromArray(queue_.get(), 1);
+        // Like MA 2.10.13: everything goes, including what's playing.
+        queue_.reset(cJSON_CreateArray());
         emit("queue_items_updated", json_str(args, "queue_id"), nullptr);
     } else if (c == "player_queues/delete_item") {
         std::string id = json_str(args, "item_id_or_index");

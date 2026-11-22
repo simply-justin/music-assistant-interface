@@ -45,7 +45,7 @@ backend::Request artist_albums(const core::MediaItem& artist);
 backend::Request playlist_tracks(const core::MediaItem& playlist);
 // Playlists (library ids, i.e. items with provider "library").
 backend::Request playlist_add_tracks(const std::string& playlist_id, const std::vector<std::string>& uris);
-backend::Request playlist_remove_tracks(const std::string& playlist_id, const std::vector<int>& positions);
+backend::Request playlist_remove_tracks(const std::string& playlist_id, const std::vector<int>& positions);  // 0-based
 backend::Request playlist_create(const std::string& name);
 backend::Request playlist_delete(const std::string& playlist_id);
 

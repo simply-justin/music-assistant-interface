@@ -18,6 +18,7 @@
 #define LV_USE_FONT_PLACEHOLDER 1
 
 #define LV_USE_QRCODE 1        // setup: sign-in QR code
+#define LV_USE_TJPGD 1         // artwork decoding on the PC (the board uses the hardware decoder)
 #define LV_USE_SYSMON 1        // diagnostics: FPS counter
 #define LV_USE_PERF_MONITOR 1
 #define LV_USE_PERF_MONITOR_POS LV_ALIGN_TOP_RIGHT

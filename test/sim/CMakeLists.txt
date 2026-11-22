@@ -22,6 +22,7 @@ target_compile_options(panel_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra
 
 set(UI ${ROOT}/components/ui)
 file(GLOB UI_SOURCES ${UI}/*.cpp ${UI}/screens/*.cpp ${UI}/fonts/*.c)
-add_executable(music_panel_sim main.cpp ${CMAKE_CURRENT_LIST_DIR}/../host/ws_posix.cpp ${UI_SOURCES})
-target_include_directories(music_panel_sim PRIVATE ${UI}/include ${UI} ${CMAKE_CURRENT_LIST_DIR}/../host)
-target_link_libraries(music_panel_sim panel_core lvgl X11 m)
+add_executable(music_panel_sim main.cpp art_loader.cpp ${CMAKE_CURRENT_LIST_DIR}/../host/ws_posix.cpp ${UI_SOURCES})
+target_include_directories(music_panel_sim PRIVATE ${UI}/include ${UI} ${CMAKE_CURRENT_LIST_DIR}/../host ${lvgl_SOURCE_DIR})
+find_package(Threads REQUIRED)
+target_link_libraries(music_panel_sim panel_core lvgl X11 m Threads::Threads)

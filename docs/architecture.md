@@ -128,8 +128,13 @@ idf.py build flash monitor
   stubs until Phase 2b; set the server/token in menuconfig meanwhile.
 - The playback-error banner shows when Music Assistant marks the current queue item unavailable;
   a richer error signal is open question 2.
-- Reconnect uses a fixed 3 s retry, not exponential backoff (marked shortcut).
+- Verified live on 2.10.13 (2026-11-22): `player_queues/clear` empties the queue and stops the
+  player even with `skip_stop`, so "Clear up next" deletes the upcoming items; playlist positions
+  for `remove_playlist_tracks` count from 1.
 - Wi-Fi (via the C6), PSRAM, flash size, partitions/OTA and chip revision come from Waveshare's examples once the board is here.
-- UI lists are capped plain lists (200–500 rows), not yet recycled/virtualized; artwork is a flat
-  colour placeholder until the artwork pipeline (performance phase / Phase 4).
-- No accent folding in dedupe ("Beyoncé" ≠ "Beyonce"), marked shortcut. Undo on the "added" toast is not implemented yet.
+- Long lists (songs, queue, library tracks/radio) are windowed: only visible rows exist (15 objects
+  for a 400-song playlist). Card grids are still capped at 300.
+- Artwork: `img/` (proxy URL, scaling with pre-rounded corners, LRU cache with pins) is portable; the
+  PC loader fetches + decodes with TJpgDec. The board loader (esp_http_client + hardware JPEG) is
+  Phase 2b.
+- No accent folding in dedupe ("Beyoncé" ≠ "Beyonce"), marked shortcut.

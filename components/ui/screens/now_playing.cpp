@@ -7,12 +7,7 @@ namespace ui {
 namespace {
 
 // Art-derived background clamped to HSL lightness ≤ 16 % and saturation ≤ 45 % (spec §1).
-lv_color_t background(lv_color_t art) {
-    lv_color_hsv_t hsv = lv_color_to_hsv(art);
-    if (hsv.s > 45) hsv.s = 45;
-    if (hsv.v > 22) hsv.v = 22;  // HSV value 22 ≈ HSL lightness ≤ 16 at s ≤ 45
-    return lv_color_hsv_to_rgb(hsv.h, hsv.s, hsv.v);
-}
+lv_color_t background(lv_color_t art) { return lv_color_hex(img::art_background(lv_color_to_u32(art) & 0xFFFFFF)); }
 
 class NowPlaying : public Screen {
 public:
@@ -66,7 +61,8 @@ private:
             kit::text(empty, tr(i18n::Str::home_pick_favourite), theme::lead(), theme::text2());
             return;
         }
-        lv_obj_set_style_bg_color(root_, background(theme::art_colour(item->uri.c_str())), 0);
+        lv_color_t bg = background(theme::art_colour(item->uri.c_str()));
+        lv_obj_set_style_bg_color(root_, bg, 0);
         bool radio = item->type == core::MediaType::Radio;
         // Playback error: shown only when Music Assistant marks the current item unavailable
         // (QueueItem.available, verified 2.10). Open question 2: a richer error signal, if any.
@@ -85,7 +81,11 @@ private:
         lv_obj_set_flex_grow(body, 1);
         lv_obj_set_style_pad_hor(body, 80, 0);
         lv_obj_set_style_pad_bottom(body, 40, 0);
-        kit::art(body, *item, 520, 20);
+        // The art-derived background follows the real artwork once it's decoded.
+        lv_obj_t* root = root_;
+        kit::art(body, *item, 520, 20, bg, [root](uint32_t avg) {
+            lv_obj_set_style_bg_color(root, background(lv_color_hex(avg)), 0);
+        });
 
         lv_obj_t* col = kit::column(body, 32);
         lv_obj_set_flex_grow(col, 1);

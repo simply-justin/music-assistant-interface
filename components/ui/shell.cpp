@@ -5,6 +5,7 @@
 
 #include <ctime>
 
+#include "artwork.hpp"
 #include "text.hpp"
 
 namespace ui {
@@ -154,7 +155,7 @@ void refresh_mini() {
 
     lv_obj_t* info = kit::row(s.mini, 16);
     lv_obj_set_width(info, 400);
-    kit::art(info, *item, 64, 10);
+    kit::art(info, *item, 64, 10, theme::surface());
     lv_obj_t* col = kit::column(info, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
@@ -486,6 +487,7 @@ void apply(app::Update update) {
         topic = Topic::Setup;
     } else if (auto* pv = std::get_if<std::shared_ptr<const app::PanelView>>(&update)) {
         s.state.panel = *pv;
+        if (!(*pv)->server_address.empty()) art::set_base("http://" + (*pv)->server_address);
         apply_diagnostics();
         topic = Topic::Panel;
     } else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&update)) {

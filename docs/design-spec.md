@@ -166,7 +166,7 @@ Rail: **Home · Search · Library · Queue · Settings**. The back control is a 
 **Design approved 2026-11-22**, with playlist screens added the same day (add to playlist, edit, Home shelf).
 
 Decided (answers 2026-11-22):
-1. **Clear queue keeps the current track.** "Clear up next" removes only the upcoming items and the current track keeps playing. *Verify* at the MA integration phase that `player_queues/clear` behaves this way. If it stops playback instead, the firmware deletes the upcoming items itself.
+1. **Clear queue keeps the current track.** "Clear up next" removes only the upcoming items and the current track keeps playing. Tested on MA 2.10.13: `player_queues/clear` empties the whole queue and stops the player (also with `skip_stop`), so the firmware deletes the upcoming items itself.
 4. **Group volume shows both.** A master slider moves the whole group, and each member has its own row below it. A single player shows only the master slider (see the VolumeOverlay board).
 9. **Languages: English and Dutch.** There is a picker under Settings › Language and changes apply without a restart. Adding a language means adding one string table plus its glyph range (see docs/architecture.md, i18n). Copy must fit the longer Dutch wording, so chips may not use fixed widths.
 

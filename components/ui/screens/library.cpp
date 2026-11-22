@@ -82,15 +82,16 @@ private:
             kit::text(content_, tr(loading ? i18n::Str::list_loading : i18n::Str::list_empty), theme::lead(), theme::text2());
             return;
         }
-        constexpr size_t kMax = 300;  // shortcut: capped, not virtualized yet (performance phase)
+        constexpr size_t kMax = 300;  // shortcut: card grids are capped, not windowed yet
         if (tab_ == Tab::Tracks || tab_ == Tab::Radio) {
-            for (size_t i = 0; i < items.size() && i < kMax; ++i) {
-                const auto& it = items[i];
+            auto list = std::make_shared<std::vector<core::MediaItem>>(std::move(items));
+            kit::virtual_list(content_, list->size(), 72, 0, [list](lv_obj_t* parent, size_t i) {
+                const auto& it = (*list)[i];
                 kit::RowOptions o;
                 o.on_tap = [it] { play(it); };
                 o.on_more = [it] { open_track_menu(it); };
-                kit::media_row(content_, it, o);
-            }
+                return kit::media_row(parent, it, o);
+            });
             return;
         }
         lv_obj_t* grid = kit::row(content_, 24);

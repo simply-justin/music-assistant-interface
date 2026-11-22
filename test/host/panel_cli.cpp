@@ -73,6 +73,11 @@ struct Cli {
             queue = *q;
         } else if (auto* l = std::get_if<std::shared_ptr<const app::PlaylistsView>>(&u)) {
             playlists = *l;
+        } else if (auto* b = std::get_if<std::shared_ptr<const app::BrowseView>>(&u)) {
+            if ((*b)->kind == app::cmd::BrowseKind::PlaylistTracks && !(*b)->loading) {
+                std::printf("Playlist songs (%zu):\n", (*b)->items.size());
+                for (size_t i = 0; i < (*b)->items.size(); ++i) std::printf("  pos %zu: %s\n", i, (*b)->items[i].name.c_str());
+            }
         } else if (auto* t = std::get_if<app::Toast>(&u)) {
             toast_action = t->action;
             std::printf("~ %s%s\n", t->text.c_str(), t->action ? ("   (type 'again' to " + t->action_label + ")").c_str() : "");
@@ -137,7 +142,8 @@ const char* kHelp = R"(commands:
   q               show queue                 rm <n>     remove queue item n
   clear           clear up next              again      run the last toast's action
   pl              list playlists             pladd <p> <n>  add result n to playlist p
-  plnew <name>    create an empty playlist
+  plnew <name>    create an empty playlist   plsongs <p>    list a playlist's songs
+  plrm <p> <pos>  remove song at position    pldel <p> <name>  delete playlist p (name must match)
   lang en|nl      switch language            quit
 )";
 
@@ -224,6 +230,23 @@ int main(int argc, char** argv) {
                 else if (!cli.playlists->playlists[p - 1].editable) std::printf("! that playlist can't be changed\n");
                 else if (auto* m = result(n)) a.handle(app::cmd::AddToPlaylist{cli.playlists->playlists[p - 1], *m});
             } else if (cmd == "plnew" && !arg.empty()) a.handle(app::cmd::CreatePlaylist{arg, std::nullopt});
+            else if ((cmd == "plsongs" || cmd == "plrm" || cmd == "pldel") && cli.playlists) {
+                std::istringstream as(arg);
+                size_t p = 0;
+                int pos = -1;
+                as >> p;
+                std::string rest;
+                if (cmd == "pldel") std::getline(as >> std::ws, rest);
+                else as >> pos;
+                if (p < 1 || p > cli.playlists->playlists.size()) std::printf("! no playlist %zu\n", p);
+                else {
+                    const auto& pl = cli.playlists->playlists[p - 1];
+                    if (cmd == "plsongs") a.handle(app::cmd::Browse{app::cmd::BrowseKind::PlaylistTracks, pl});
+                    else if (cmd == "plrm") a.handle(app::cmd::RemoveFromPlaylist{pl, pos});
+                    else if (rest != pl.name) std::printf("! pldel needs the exact name: pldel %zu %s\n", p, pl.name.c_str());
+                    else a.handle(app::cmd::DeletePlaylist{pl});
+                }
+            }
             else if (cmd == "rm" && cli.queue) {
                 size_t n = std::strtoul(arg.c_str(), nullptr, 10);
                 if (n >= 1 && n <= cli.queue->items.size()) a.handle(app::cmd::RemoveFromQueue{cli.queue->items[n - 1].queue_item_id});

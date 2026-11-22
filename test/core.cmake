@@ -21,6 +21,7 @@ set(CORE_SOURCES
     ${ROOT}/components/core/text.cpp
     ${ROOT}/components/core/dedupe.cpp
     ${ROOT}/components/core/search.cpp
+    ${ROOT}/components/img/artwork.cpp
     ${ROOT}/components/backend/ma_session.cpp
     ${ROOT}/components/backend/ma_commands.cpp
     ${ROOT}/components/backend/mock_backend.cpp
@@ -42,6 +43,7 @@ add_library(panel_core STATIC ${CORE_SOURCES})
 target_include_directories(panel_core PUBLIC
     ${CJSON_DIR}
     ${ROOT}/components/core/include
+    ${ROOT}/components/img/include
     ${ROOT}/components/backend/include
     ${ROOT}/components/i18n/include ${GEN}
     ${ROOT}/components/app/include ${ROOT}/components/app)

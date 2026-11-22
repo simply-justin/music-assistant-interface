@@ -147,9 +147,19 @@ private:
             return;
         }
 
-        constexpr size_t kAll = 500;  // shortcut: plain list; virtualized recycling comes in the performance phase
+        constexpr size_t kAll = 300;  // cards are capped; long track lists are windowed
         switch (filter_) {
-            case Filter::Tracks: track_rows(results_, r.tracks, kAll); return;
+            case Filter::Tracks: {
+                auto tracks = std::make_shared<std::vector<core::MediaItem>>(r.tracks);
+                kit::virtual_list(results_, tracks->size(), 72, 0, [tracks](lv_obj_t* list, size_t i) {
+                    const auto& t = (*tracks)[i];
+                    kit::RowOptions o;
+                    o.on_tap = [t] { play(t); };
+                    o.on_more = [t] { open_track_menu(t); };
+                    return kit::media_row(list, t, o);
+                });
+                return;
+            }
             case Filter::Artists: card_row(r.artists, kAll, true); return;
             case Filter::Albums: card_row(r.albums, kAll, true); return;
             case Filter::Playlists: card_row(r.playlists, kAll, true); return;

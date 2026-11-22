@@ -119,7 +119,8 @@ Request queue_move_item(const std::string& q, const std::string& item_id, int po
     return r;
 }
 
-// Decision 2026-11-22: clearing keeps the current track playing (skip_stop, server 2.10).
+// Empties the whole queue (the player stops, even with skip_stop: tested on 2.10.13). "Clear up
+// next" therefore deletes items instead (features/queue.cpp); this is only used when idle.
 Request queue_clear(const std::string& q) {
     Request r = on_queue("player_queues/clear", q);
     cJSON_AddBoolToObject(r.args.get(), "skip_stop", true);
@@ -203,10 +204,11 @@ Request playlist_add_tracks(const std::string& playlist_id, const std::vector<st
 }
 
 Request playlist_remove_tracks(const std::string& playlist_id, const std::vector<int>& positions) {
-    Request r = make("music/playlists/remove_playlist_tracks");  // verify: positions 0- or 1-based
+    Request r = make("music/playlists/remove_playlist_tracks");
     cJSON_AddStringToObject(r.args.get(), "db_playlist_id", playlist_id.c_str());
     cJSON* list = cJSON_AddArrayToObject(r.args.get(), "positions_to_remove");
-    for (int p : positions) cJSON_AddItemToArray(list, cJSON_CreateNumber(p));
+    // Our positions are 0-based list indexes; MA counts from 1 (tested live on 2.10.13).
+    for (int p : positions) cJSON_AddItemToArray(list, cJSON_CreateNumber(p + 1));
     return r;
 }
 
@@ -290,6 +292,7 @@ core::MediaItem media_item(const cJSON* o) {
         if (!img || json_str(candidate, "type") == "thumb") img = candidate;
         if (json_str(candidate, "type") == "thumb") break;
     }
+    if (!img && cJSON_IsObject(cJSON_GetObjectItemCaseSensitive(o, "image"))) img = cJSON_GetObjectItemCaseSensitive(o, "image");
     if (img) {
         m.image = core::Image{json_str(img, "path"), json_str(img, "provider"), json_str(img, "proxy_id"),
                               json_bool(img, "remotely_accessible")};

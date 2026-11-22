@@ -83,7 +83,7 @@ private:
             kit::overline(col, tr(i18n::Str::home_nothing_playing), theme::text2());
             kit::text(col, tr(i18n::Str::home_pick_favourite), theme::lead(), theme::text(), true);
         } else {
-            kit::art(card, *item, 224, 14);
+            kit::art(card, *item, 224, 14, lv_color_hex(0x1B2A2E));
             lv_obj_t* col = kit::column(card, 0);
             lv_obj_set_flex_grow(col, 1);
             lv_obj_set_size(col, 1, lv_pct(100));

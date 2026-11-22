@@ -47,6 +47,7 @@ private:
         std::vector<core::MediaItem> tracks = list ? list->items : std::vector<core::MediaItem>{};
         uint32_t total = 0;
         for (const auto& t : tracks) total += t.duration_s;
+        size_t track_count = tracks.size();
 
         kit::back_chip(root_, back_label(), [] { back(); });
         lv_obj_t* body = kit::row(root_, 48);
@@ -64,8 +65,8 @@ private:
                                                               : i18n::Str::type_playlist;
         kit::overline(info, tr(type));
         kit::text(info, item.name, theme::h1(), theme::text(), true);
-        if (!tracks.empty())
-            kit::text(info, songs(tracks.size()) + " · " + duration(total), theme::body(), theme::text2());
+        if (track_count)
+            kit::text(info, songs(track_count) + " · " + duration(total), theme::body(), theme::text2());
 
         lv_obj_t* right = kit::column(body, 16);
         lv_obj_set_flex_grow(right, 1);
@@ -104,29 +105,28 @@ private:
             }
         }
 
-        lv_obj_t* rows = kit::scroll_column(right, 2);
-        lv_obj_set_width(rows, lv_pct(100));
-        lv_obj_set_flex_grow(rows, 1);
-        lv_obj_set_style_pad_bottom(rows, 24, 0);
         if (tracks.empty()) {
-            kit::text(rows, tr(list && !list->loading ? i18n::Str::list_empty : i18n::Str::list_loading), theme::lead(), theme::text2());
+            kit::text(right, tr(list && !list->loading ? i18n::Str::list_empty : i18n::Str::list_loading), theme::lead(), theme::text2());
             return;
         }
         auto now = state().now_playing();
-        for (size_t i = 0; i < tracks.size() && i < 300; ++i) {  // shortcut: capped, not virtualized yet
-            const auto& t = tracks[i];
+        std::string now_uri = now ? now->uri : "";
+        auto shared = std::make_shared<std::vector<core::MediaItem>>(std::move(tracks));
+        bool editing = editing_;
+        kit::virtual_list(right, shared->size(), 64, 2, [shared, now_uri, editing, item](lv_obj_t* parent, size_t i) {
+            const auto& t = (*shared)[i];
             kit::RowOptions o;
             o.height = 64;
-            o.playing = now && now->uri == t.uri;
-            if (editing_) {
-                int pos = static_cast<int>(i);
+            o.playing = !now_uri.empty() && now_uri == t.uri;
+            if (editing) {
+                int pos = static_cast<int>(i);  // 0-based list index; ma_commands converts for the server
                 o.on_remove = [item, pos] { send(app::cmd::RemoveFromPlaylist{item, pos}); };
             } else {
                 o.on_tap = [t] { play(t); };
                 o.on_more = [t] { open_track_menu(t); };
             }
-            kit::media_row(rows, t, o);
-        }
+            return kit::media_row(parent, t, o);
+        });
     }
 
     lv_obj_t* root_ = nullptr;

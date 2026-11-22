@@ -6,6 +6,7 @@
 #include <string>
 
 #include "backend/backend.hpp"
+#include "backend/backoff.hpp"
 #include "backend/ma_session.hpp"
 
 typedef struct esp_websocket_client* esp_websocket_client_handle_t;
@@ -34,6 +35,7 @@ private:
     Session session_;
     esp_websocket_client_handle_t ws_ = nullptr;
     std::string rx_;  // reassembles one message split over several data events (websocket task only)
+    backend::Backoff backoff_;  // core task only
 };
 
 }  // namespace ma

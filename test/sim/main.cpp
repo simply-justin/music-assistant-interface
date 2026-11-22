@@ -11,6 +11,7 @@
 
 #include "app/app.hpp"
 #include "backend/mock_backend.hpp"
+#include "art_loader.hpp"
 #include "fake_platform.hpp"
 #include "host_ma_backend.hpp"
 #include "lvgl.h"
@@ -91,6 +92,8 @@ int main(int argc, char** argv) {
     }
     std::vector<app::Update> inbox;
     app::App core(*be, settings, platform, [&](app::Update u) { inbox.push_back(std::move(u)); });
+    SimArtLoader art;
+    ui::set_art_loader([&art](ui::ArtRequest r, auto done) { art.load(std::move(r), std::move(done)); }, 32u << 20);
     core.start();  // first: the UI's first screen already sends commands
     ui::start([&](app::Command c) { core.handle(c); });  // same thread: the queue is just `inbox`
 
@@ -102,6 +105,7 @@ int main(int argc, char** argv) {
             auto batch = std::move(inbox);
             inbox.clear();
             for (auto& u : batch) ui::apply(std::move(u));
+            art.drain();
             lv_timer_handler();
             usleep(5000);
         }
@@ -172,6 +176,20 @@ int main(int argc, char** argv) {
     playlist.editable = true;
     ui::open_detail(playlist);
     shot("07_playlist_detail");
+    // Windowed list check: scroll deep into the ~400-song playlist and count the row objects.
+    std::function<lv_obj_t*(lv_obj_t*)> find_list = [&](lv_obj_t* o) -> lv_obj_t* {
+        if (lv_obj_get_scroll_bottom(o) > 10000) return o;
+        for (uint32_t i = 0; i < lv_obj_get_child_count(o); ++i)
+            if (lv_obj_t* f = find_list(lv_obj_get_child(o, static_cast<int32_t>(i)))) return f;
+        return nullptr;
+    };
+    if (lv_obj_t* list = find_list(lv_screen_active())) {
+        lv_obj_scroll_to_y(list, 20000, LV_ANIM_OFF);
+        shot("07b_playlist_scrolled");
+        std::printf("windowed list: %u row objects for a list of ~400\n", static_cast<unsigned>(lv_obj_get_child_count(list) - 1));
+    } else {
+        std::printf("windowed list: not found\n");
+    }
     ui::open(ui::ScreenId::Settings);
     shot("08_settings");
     ui::open(ui::ScreenId::Home);

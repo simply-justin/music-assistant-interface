@@ -37,7 +37,7 @@ public:
         if (auto* a = std::get_if<cmd::AddToQueue>(&c)) {
             add(*a);
         } else if (std::holds_alternative<cmd::ClearUpNext>(c)) {
-            ctx_.send(ma::cmd::queue_clear(q));
+            clear_up_next();
         } else if (auto* r = std::get_if<cmd::RemoveFromQueue>(&c)) {
             ctx_.send(ma::cmd::queue_delete_item(q, r->queue_item_id));
         } else if (auto* m = std::get_if<cmd::MoveInQueue>(&c)) {
@@ -67,9 +67,24 @@ private:
             return;
         }
         auto option = a.next ? ma::cmd::PlayOption::Next : ma::cmd::PlayOption::Add;
-        std::string name = a.item.name;
-        ctx_.send(ma::cmd::play_media(ctx_.queue_id, {a.item.uri}, option),
-                  [this, name](backend::Response&&) { ctx_.toast(i18n::tr(i18n::Str::toast_added_to_queue, name)); });
+        std::string name = a.item.name, uri = a.item.uri, q = ctx_.queue_id;
+        ctx_.send(ma::cmd::play_media(q, {uri}, option), [this, name, uri, q](backend::Response&&) {
+            // Find the item just added (the newest with this uri) so the toast can offer Undo.
+            ctx_.send(ma::cmd::queue_items(q, kMaxItems, 0), [this, name, uri](backend::Response&& r) {
+                std::string id;
+                const cJSON* it;
+                cJSON_ArrayForEach(it, r.result.get()) {
+                    core::QueueItem qi = ma::parse::queue_item(it);
+                    if (qi.media && qi.media->uri == uri) id = qi.queue_item_id;  // last match = newest
+                }
+                Toast t{i18n::tr(i18n::Str::toast_added_to_queue, name), std::nullopt, {}, false};
+                if (!id.empty()) {
+                    t.action = Command{cmd::RemoveFromQueue{id}};
+                    t.action_label = i18n::tr(i18n::Str::toast_undo);
+                }
+                ctx_.publish(std::move(t));
+            });
+        });
     }
 
     // The selected player plays from its group's queue when grouped, else its own (same id).
@@ -85,6 +100,16 @@ private:
             if (has_queue) ma::parse::queue_state(r.result.get(), queue_);  // also gives the initial state
             refresh();
         });
+    }
+
+    // "Clear up next" keeps the current song playing. player_queues/clear can't do that: on MA
+    // 2.10.13 it empties the whole queue and the player goes idle, even with skip_stop (tested
+    // live 2026-11-22). So remove the upcoming items one by one; clear only when nothing plays.
+    void clear_up_next() {
+        const std::string& q = ctx_.queue_id;
+        if (queue_.current_index < 0) return ctx_.send(ma::cmd::queue_clear(q));
+        for (size_t i = queue_.items.size(); i-- > static_cast<size_t>(queue_.current_index) + 1;)
+            ctx_.send(ma::cmd::queue_delete_item(q, queue_.items[i].queue_item_id));
     }
 
     void refresh() {

@@ -89,14 +89,12 @@ private:
             banner(right_, i18n::tr(i18n::Str::queue_provider_down, kit::provider_name(worst->first)),
                    i18n::tr(i18n::Str::queue_provider_down_body, std::to_string(worst->second)));
         }
-        lv_obj_t* list = kit::scroll_column(right_, 4);
-        lv_obj_set_width(list, lv_pct(100));
-        lv_obj_set_flex_grow(list, 1);
-        for (size_t i = first; i < q->items.size() && i < first + 200; ++i) {  // shortcut: capped, not virtualized yet
-            const core::QueueItem& qi = q->items[i];
+        auto items = std::make_shared<std::vector<core::QueueItem>>(q->items.begin() + static_cast<long>(first), q->items.end());
+        kit::virtual_list(right_, items->size(), 76, 4, [items, first](lv_obj_t* list, size_t n) {
+            const core::QueueItem& qi = (*items)[n];
             core::MediaItem m = qi.media ? *qi.media : core::MediaItem{};
             if (!qi.media) m.name = qi.name;
-            int index = static_cast<int>(i);
+            int index = static_cast<int>(first + n);
             std::string id = qi.queue_item_id;
             kit::RowOptions o;
             o.height = 76;
@@ -105,23 +103,27 @@ private:
             lv_obj_t* r = kit::media_row(list, m, o);
             if (!qi.available) kit::tag(r, tr(i18n::Str::queue_unavailable), theme::warning());
             std::string name = m.name;
-            kit::on_long_press(r, [id, name] {
-                lv_obj_t* s = kit::sheet(560);
-                kit::text(s, name, theme::h2(), theme::text());
-                kit::button(s, kit::Button::Secondary, icon::play_next, tr(i18n::Str::menu_play_next), [id] {
-                    send(app::cmd::MoveInQueue{id, -1000});  // to the front of "up next"; server clamps
-                    kit::close_sheets();
-                });
-                kit::button(s, kit::Button::Secondary, icon::chevron_up, tr(i18n::Str::queue_move_up), [id] {
-                    send(app::cmd::MoveInQueue{id, -1});
-                    kit::close_sheets();
-                });
-                kit::button(s, kit::Button::Secondary, icon::chevron_down, tr(i18n::Str::queue_move_down), [id] {
-                    send(app::cmd::MoveInQueue{id, 1});
-                    kit::close_sheets();
-                });
-            });
-        }
+            kit::on_long_press(r, [id, name] { queue_item_menu(id, name); });
+            return r;
+        });
+    }
+
+    // Long-press: Play next / Move up / Move down (instead of drag).
+    static void queue_item_menu(const std::string& id, const std::string& name) {
+        lv_obj_t* s = kit::sheet(560);
+        kit::text(s, name, theme::h2(), theme::text());
+        kit::button(s, kit::Button::Secondary, icon::play_next, tr(i18n::Str::menu_play_next), [id] {
+            send(app::cmd::MoveInQueue{id, -1000});  // to the front of "up next" (verify: the server clamps the shift)
+            kit::close_sheets();
+        });
+        kit::button(s, kit::Button::Secondary, icon::chevron_up, tr(i18n::Str::queue_move_up), [id] {
+            send(app::cmd::MoveInQueue{id, -1});
+            kit::close_sheets();
+        });
+        kit::button(s, kit::Button::Secondary, icon::chevron_down, tr(i18n::Str::queue_move_down), [id] {
+            send(app::cmd::MoveInQueue{id, 1});
+            kit::close_sheets();
+        });
     }
 
     lv_obj_t *left_ = nullptr, *right_ = nullptr;

@@ -7,6 +7,7 @@ conn_wrong_server,This is a different Music Assistant server,Dit is een andere M
 toast_added_to_queue,Added {} to the queue,{} toegevoegd aan de wachtrij
 toast_already_in_queue,{} is already in the queue,{} staat al in de wachtrij
 toast_add_again,Add again,Toch toevoegen
+toast_undo,Undo,Ongedaan maken
 toast_favourite_added,Added to favourites,Toegevoegd aan favorieten
 toast_favourite_removed,Removed from favourites,Verwijderd uit favorieten
 toast_command_failed,That didn't work. Try again.,Dat lukte niet. Probeer opnieuw.

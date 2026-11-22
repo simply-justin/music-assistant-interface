@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "backend/backoff.hpp"
 #include "backend/ma_session.hpp"
 #include "ws_posix.hpp"
 
@@ -52,7 +53,7 @@ public:
         for (auto& m : msgs) session_.on_text(m);
         if (!alive) {
             session_.on_closed();
-            retry_at_ = now + 3000;
+            retry_at_ = now + backoff_.next();
         }
     }
 
@@ -60,10 +61,12 @@ private:
     void try_connect() {
         if (url_.empty()) return;
         if (ws_.connect(url_)) {
+            backoff_.reset();
             session_.on_open();
         } else {
-            std::printf("! cannot reach %s, retrying in 3 s\n", url_.c_str());
-            retry_at_ = host_now_ms() + 3000;
+            uint32_t delay = backoff_.next();
+            std::printf("! cannot reach %s, retrying in %u s\n", url_.c_str(), static_cast<unsigned>(delay / 1000));
+            retry_at_ = host_now_ms() + delay;
         }
     }
 
@@ -71,5 +74,6 @@ private:
     WsPosix ws_;
     ma::Session session_;
     uint32_t retry_at_ = 0;
+    backend::Backoff backoff_;
 };
 
