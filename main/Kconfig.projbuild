@@ -1,0 +1,22 @@
+menu "Music panel"
+
+    choice PANEL_BACKEND
+        prompt "Backend"
+        default PANEL_BACKEND_MOCK
+        config PANEL_BACKEND_MOCK
+            bool "Mock (no server needed)"
+        config PANEL_BACKEND_MA
+            bool "Music Assistant"
+    endchoice
+
+    # Development only: the Setup screens replace these once the UI exists.
+    config PANEL_MA_URL
+        string "Music Assistant WebSocket URL"
+        default "ws://homeassistant.local:8095/ws"
+        depends on PANEL_BACKEND_MA
+    config PANEL_MA_TOKEN
+        string "Music Assistant token (empty if not required)"
+        default ""
+        depends on PANEL_BACKEND_MA
+
+endmenu

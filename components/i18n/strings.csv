@@ -1,0 +1,15 @@
+id,en,nl
+conn_connecting,Connecting to Music Assistant…,Verbinden met Music Assistant…
+conn_offline,Can't reach Music Assistant,Music Assistant niet bereikbaar
+conn_auth_failed,Sign-in was rejected,Aanmelden geweigerd
+conn_incompatible,Music Assistant needs an update,Music Assistant moet worden bijgewerkt
+conn_wrong_server,This is a different Music Assistant server,Dit is een andere Music Assistant-server
+toast_added_to_queue,Added {} to the queue,{} toegevoegd aan de wachtrij
+toast_already_in_queue,{} is already in the queue,{} staat al in de wachtrij
+toast_add_again,Add again,Toch toevoegen
+toast_favourite_added,Added to favourites,Toegevoegd aan favorieten
+toast_favourite_removed,Removed from favourites,Verwijderd uit favorieten
+toast_command_failed,That didn't work. Try again.,Dat lukte niet. Probeer opnieuw.
+toast_added_to_playlist,Added to {},Toegevoegd aan {}
+toast_playlist_created,Playlist {} created,Afspeellijst {} gemaakt
+toast_playlist_deleted,Playlist deleted,Afspeellijst verwijderd
