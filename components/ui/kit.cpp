@@ -320,6 +320,7 @@ lv_obj_t* section_header(lv_obj_t* parent, const std::string& title, const std::
         lv_obj_set_height(l, 40);
         lv_obj_set_ext_click_area(l, 8);
         lv_obj_set_style_pad_hor(l, 8, 0);
+        lv_obj_set_style_margin_right(l, -8, 0);  // the text, not the press area, lines up with the content edge
         lv_obj_set_style_radius(l, theme::r_control(), 0);
         lv_obj_set_style_bg_color(l, theme::surface(), LV_STATE_PRESSED);
         lv_obj_set_style_bg_opa(l, LV_OPA_COVER, LV_STATE_PRESSED);

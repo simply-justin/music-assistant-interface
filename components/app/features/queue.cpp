@@ -17,7 +17,16 @@ public:
     void on_connected() override { resolve_queue(); }
 
     void on_event(const backend::Event& ev) override {
-        if (ev.name == "player_updated" && ev.object_id == ctx_.player_id) return resolve_queue();  // (un)grouped?
+        if (ev.name == "player_updated" && ev.object_id == ctx_.player_id) {
+            // MA sends this every few seconds while playing; only a (un)group can move the queue.
+            if (!ev.data) return;
+            core::PlayerState p = ma::parse::player(ev.data.get());
+            std::string group = p.synced_to;
+            for (const auto& m : p.group_members) group += ',' + m;
+            if (group == group_) return;
+            group_ = group;
+            return resolve_queue();
+        }
         if (ev.object_id != ctx_.queue_id) return;
         if (ev.name == "queue_items_updated") {
             refresh();
@@ -126,6 +135,7 @@ private:
     }
 
     void publish() { ctx_.publish(std::make_shared<const core::QueueState>(queue_)); }
+    std::string group_;  // grouping of our player at the last resolve
 
     Context& ctx_;
     core::QueueState queue_;

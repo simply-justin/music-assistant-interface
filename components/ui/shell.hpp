@@ -59,7 +59,6 @@ std::unique_ptr<Screen> make_queue();
 std::unique_ptr<Screen> make_settings();
 std::unique_ptr<Screen> make_now_playing();
 std::unique_ptr<Screen> make_detail();
-std::unique_ptr<Screen> make_settings_page();
 std::unique_ptr<Screen> make_setup();
 std::unique_ptr<Screen> make_boot();
 SettingsPage settings_page();
@@ -85,7 +84,7 @@ lv_obj_t* card(lv_obj_t* parent, const std::string& title = {});
 lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
                   bool chevron = true);
 // A speaker as a fully tappable row: radio dot, name, live status, optional "Group" button.
-lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected, bool show_group);
+lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected);
 void open_group(const std::string& leader_id);
 // Warning banner (offline, provider down, playback error).
 lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& body);

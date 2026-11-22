@@ -98,8 +98,6 @@ type_artist,Artist,Artiest
 type_playlist,Playlist,Afspeellijst
 volume_each_speaker,Each speaker,Per speaker
 volume_hint,The top slider moves all speakers together. − and + step by 5.,De bovenste schuif regelt alle speakers samen. − en + verspringen per 5.
-settings_play_on,Play music on,Muziek afspelen op
-settings_this_panel,This panel,Dit scherm
 settings_language,Language,Taal
 settings_server,Music Assistant,Music Assistant
 language_name_self,English,Nederlands
@@ -285,11 +283,14 @@ spk_offline,Offline,Offline
 spk_joined,Playing with {},Speelt mee met {}
 spk_group_with,Group with {},Groep met {}
 spk_playing,Playing · {},Speelt · {}
-spk_group_btn,Group,Groeperen
 group_title,Group speakers,Speakers groeperen
 group_sub,Play the same music as {} on:,Dezelfde muziek als {} afspelen op:
 group_leader,Leads the group,Leidt de groep
 group_save,Save,Opslaan
 group_ungroup,Ungroup,Groep opheffen
 group_none,Music Assistant says this speaker can't be grouped with the others.,Volgens Music Assistant kan deze speaker niet met de andere gegroepeerd worden.
-settings_speakers_hint,Speakers can be grouped when Music Assistant supports it for them (same type).,Speakers kunnen gegroepeerd worden als Music Assistant dat voor ze ondersteunt (zelfde type).
+spk_add_speakers,Play on more speakers,Op meer speakers afspelen
+spk_edit_group,Change group,Groep aanpassen
+spk_group_sub,Same music as {} in other rooms,Dezelfde muziek als {} in andere kamers
+bar_idle_sub,Choose something to play,Kies iets om af te spelen
+conn_status,Status,Status

@@ -196,6 +196,14 @@ int main(int argc, char** argv) {
     run(300);
     ui::open_speakers();
     shot("09_speakers");
+    // Tap test: the name, the status line and empty space in the Kitchen row must all hit the row.
+    {
+        lv_point_t pts[] = {{420, 432}, {420, 452}, {760, 442}};
+        lv_obj_t* hit[3];
+        for (int i = 0; i < 3; ++i) hit[i] = lv_indev_search_obj(lv_layer_top(), &pts[i]);
+        bool same = hit[0] && hit[0] == hit[1] && hit[1] == hit[2] && lv_obj_get_width(hit[0]) > 400;
+        std::printf("speaker row tap test: %s (width %d)\n", same ? "PASS" : "FAIL", hit[0] ? (int)lv_obj_get_width(hit[0]) : -1);
+    }
     ui::open_volume();
     shot("10_volume");
     core::MediaItem track;
@@ -216,14 +224,6 @@ int main(int argc, char** argv) {
     shot("12_favourite_preview");
     ui::open(ui::ScreenId::Settings);
     shot("13_settings");
-    // Tap test: the name, the status line and empty space in the Kitchen row must all hit the row.
-    {
-        lv_point_t pts[] = {{379, 219}, {379, 240}, {560, 228}};
-        lv_obj_t* hit[3];
-        for (int i = 0; i < 3; ++i) hit[i] = lv_indev_search_obj(lv_screen_active(), &pts[i]);
-        bool same = hit[0] && hit[0] == hit[1] && hit[1] == hit[2] && lv_obj_get_width(hit[0]) > 400;
-        std::printf("speaker row tap test: %s (width %d)\n", same ? "PASS" : "FAIL", hit[0] ? (int)lv_obj_get_width(hit[0]) : -1);
-    }
     ui::open_settings_page(ui::SettingsPage::Display);
     shot("14_settings_display");
     ui::open_settings_page(ui::SettingsPage::Server);
@@ -263,5 +263,8 @@ int main(int argc, char** argv) {
     shot("25_dark_teal_round_home");
     ui::open(ui::ScreenId::Library);
     shot("26_dark_teal_round_library");
+    ui::apply(std::make_shared<const core::QueueState>());  // nothing playing
+    ui::open(ui::ScreenId::Home);
+    shot("27_idle_bar");
     return 0;
 }

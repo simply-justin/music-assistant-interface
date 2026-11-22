@@ -27,7 +27,7 @@ struct Shown {
     std::shared_ptr<img::Bitmap> bitmap;  // keeps the pixels alive even if evicted elsewhere
 };
 
-void show(lv_obj_t* box, const std::string& key, std::shared_ptr<img::Bitmap> bmp) {
+void show(lv_obj_t* box, const std::string& key, std::shared_ptr<img::Bitmap> bmp, bool fade) {
     auto* s = new Shown{key, {}, bmp};
     s->dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
     s->dsc.header.cf = LV_COLOR_FORMAT_RGB565;
@@ -39,7 +39,7 @@ void show(lv_obj_t* box, const std::string& key, std::shared_ptr<img::Bitmap> bm
     lv_obj_t* image = lv_image_create(box);
     lv_image_set_src(image, &s->dsc);
     lv_obj_center(image);
-    if (theme::motion()) lv_obj_fade_in(image, 150, 0);  // micro-animation: opacity on this one image only, not its container
+    if (fade && theme::motion()) lv_obj_fade_in(image, 150, 0);  // only when it arrives late; a cache hit on rebuild must not flash  // micro-animation: opacity on this one image only, not its container
     art_state().cache.pin(key);
     lv_obj_add_event_cb(image, [](lv_event_t* e) {
         auto* s = static_cast<Shown*>(lv_event_get_user_data(e));
@@ -70,7 +70,7 @@ void attach(lv_obj_t* box, const core::MediaItem& item, int w, int h, int radius
     std::string key = url + "|" + std::to_string(w) + "x" + std::to_string(h) + "|" + std::to_string(radius) + "|" + std::to_string(bg_rgb);
 
     if (auto hit = a.cache.get(key)) {
-        show(box, key, hit);
+        show(box, key, hit, false);
         if (on_ready) on_ready(hit->average);
         return;
     }
@@ -84,7 +84,7 @@ void attach(lv_obj_t* box, const core::MediaItem& item, int w, int h, int radius
     }, LV_EVENT_DELETE, alive);
     auto deliver = [box, key, flag, on_ready](std::shared_ptr<img::Bitmap> bmp) {
         if (!bmp || !*flag) return;
-        show(box, key, bmp);
+        show(box, key, bmp, true);
         if (on_ready) on_ready(bmp->average);
     };
     auto& waiting = a.pending[key];

@@ -12,7 +12,7 @@ namespace ui {
 
 using Send = std::function<void(app::Command)>;
 
-enum class ScreenId : uint8_t { Home, Search, Library, Queue, Settings, NowPlaying, Detail, SettingsPage, Setup, Boot };
+enum class ScreenId : uint8_t { Home, Search, Library, Queue, Settings, NowPlaying, Detail, Setup, Boot };
 enum class SettingsPage : uint8_t { Display, Wifi, Server, Language, About, Appearance };
 
 void start(Send send);

@@ -36,15 +36,16 @@ MA_TOKEN=<long-lived token>
 The mouse is your finger: click = tap, hold ~0.5 s = long-press, drag = scroll.
 Close the window to quit.
 
-**Before tapping Play in `--live` mode:** pick the speaker (top right chip) and turn the volume
-down (speaker icon in the bottom bar) — the panel plays exactly where and as loud as you tell it.
+**Before tapping Play in `--live` mode:** pick the speaker (speaker button in the bottom bar, right) and
+turn the volume down (slider next to it) — the panel plays exactly where and as loud as you tell it.
 
 ## 3. What to try (and what should happen)
 
 **Home**
 - Favourites grid (6 tiles): tap → plays. Hold → preview with Play / Play next / Add to queue / Remove.
 - "Recently played / Your playlists" switch below. "See all" → Library.
-- Speaker chip → speaker list; pick one → it becomes the speaker for everything.
+- Speaker button in the bottom bar → speaker list; pick one → it becomes the speaker for everything.
+  "Play on more speakers" under the list groups speakers (only those Music Assistant can group).
 
 **Search** (rail → Search)
 - Type with the on-screen keyboard: your library answers first ("From your library, still
@@ -67,7 +68,7 @@ down (speaker icon in the bottom bar) — the panel plays exactly where and as l
 Open a playlist → Play / Shuffle / heart; **Edit** (only for playlists you can change) → × removes
 a song, "Delete playlist" asks first.
 
-**Settings**
+**Settings** — categories on the left, the page on the right.
 - Screen & night mode: brightness, dim after, night schedule, "Preview dimmed screen".
 - Leave the window alone for the "dim after" time → clock screen; click → wakes.
 - Music Assistant: server, version, your services and whether they work, preferred-service order.

@@ -94,36 +94,34 @@ std::string status(const core::PlayerState& p) {
 }
 }  // namespace
 
-lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected, bool show_group) {
-    lv_obj_t* r = kit::row(parent, 14);
-    lv_obj_set_size(r, lv_pct(100), 68);
+// One speaker: icon tile, name, status; the selected one is a filled block with a check.
+lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected) {
+    lv_obj_t* r = kit::row(parent, 16);
+    lv_obj_set_size(r, lv_pct(100), 72);
     lv_obj_set_style_pad_hor(r, 12, 0);
-    lv_obj_set_style_radius(r, theme::r_control(), 0);
+    lv_obj_set_style_radius(r, theme::r_card(), 0);
+    lv_obj_set_style_bg_color(r, theme::elevated(), 0);
+    lv_obj_set_style_bg_opa(r, selected ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
     lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
-    // Radio indicator: an outlined circle, filled with the accent when selected.
-    lv_obj_t* dot = lv_obj_create(r);
-    lv_obj_remove_style_all(dot);
-    lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(dot, 22, 22);
-    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(dot, selected ? 7 : 2, 0);
-    lv_obj_set_style_border_color(dot, selected ? theme::accent() : theme::text3(), 0);
-    kit::icon(r, icon::speaker, 28, p.available ? theme::text2() : theme::text3());
-    lv_obj_t* col = kit::column(r, 2);
+    lv_obj_t* tile = kit::row(r, 0);
+    lv_obj_set_size(tile, 48, 48);
+    lv_obj_set_style_radius(tile, theme::r_control(), 0);
+    lv_obj_set_style_bg_color(tile, selected ? theme::accent() : theme::surface(), 0);
+    lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
+    lv_obj_set_flex_align(tile, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    kit::icon(tile, icon::speaker, 26, selected ? theme::on_accent() : p.available ? theme::text2() : theme::text3());
+    lv_obj_t* col = kit::column(r, 4);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
-    kit::text(col, p.name, theme::meta(), p.available ? theme::text() : theme::text3());
+    kit::text(col, p.name, theme::body(), p.available ? theme::text() : theme::text3());
     lv_obj_t* st = kit::row(col, 6);
     lv_obj_set_width(st, lv_pct(100));
     if (p.state == core::PlaybackState::Playing && p.available) kit::equalizer(st, theme::accent(), true);
     lv_obj_t* sl = kit::text(st, status(p), theme::label(), theme::text2());
     lv_obj_set_flex_grow(sl, 1);
     lv_obj_set_width(sl, 1);
-    if (show_group && p.available && p.synced_to.empty() && !p.can_group_with.empty()) {
-        std::string id = p.player_id;
-        kit::chip(r, nullptr, tr(i18n::Str::spk_group_btn), p.group_members.size() > 1, [id] { open_group(id); });
-    }
+    if (selected) kit::icon(r, icon::check, 26, theme::accent());
     std::string id = p.player_id;
     kit::on_click(r, [id] { send(app::cmd::SelectPlayer{id}); });
     return r;
@@ -131,15 +129,30 @@ lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selecte
 
 void open_speakers() {
     kit::close_sheets();
-    lv_obj_t* s = kit::sheet(680);
+    lv_obj_t* s = kit::sheet(640);
     sheet_header(s, tr(i18n::Str::speakers_title));
     const auto* pv = state().players.get();
     if (!pv) return;
-    lv_obj_t* list = kit::column(s, 0);
+    lv_obj_t* list = kit::column(s, 4);
     lv_obj_set_width(list, lv_pct(100));
     for (const auto& p : pv->players) {
-        lv_obj_t* r = speaker_row(list, p, p.player_id == pv->selected_id, true);
+        lv_obj_t* r = speaker_row(list, p, p.player_id == pv->selected_id);
         kit::on_click(r, [] { kit::close_sheets(); });  // picking a speaker also closes the sheet
+    }
+    // Grouping belongs to the chosen speaker: one quiet row under the list, only when MA allows it.
+    const core::PlayerState* sel = state().selected();
+    if (sel && sel->available && sel->synced_to.empty() && !sel->can_group_with.empty()) {
+        lv_obj_t* div = lv_obj_create(s);
+        lv_obj_remove_style_all(div);
+        lv_obj_remove_flag(div, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_size(div, lv_pct(100), 1);
+        lv_obj_set_style_bg_color(div, theme::hairline(), 0);
+        lv_obj_set_style_bg_opa(div, LV_OPA_COVER, 0);
+        std::string id = sel->player_id;
+        bool grouped = sel->group_members.size() > 1;
+        lv_obj_t* g = nav_row(s, icon::plus, tr(grouped ? i18n::Str::spk_edit_group : i18n::Str::spk_add_speakers),
+                              i18n::tr(i18n::Str::spk_group_sub, sel->name), [id] { open_group(id); });
+        lv_obj_set_style_pad_hor(g, 12, 0);
     }
 }
 

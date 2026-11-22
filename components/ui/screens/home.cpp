@@ -51,7 +51,7 @@ private:
         lv_obj_remove_flag(band_, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_flag(band_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_pos(band_, -theme::kPad, -20);
-        lv_obj_set_size(band_, theme::kScreenW - theme::kSideW, 20 + 48 + 14 + 120 + 24);  // header + tiles + margin
+        lv_obj_set_size(band_, theme::kScreenW - theme::kSideW, 20 + 48 + 14 + 124 + 24);  // header + tiles + margin
         lv_obj_set_style_bg_color(band_, now ? theme::art_tint(art) : theme::bg(), 0);
         lv_obj_set_style_bg_opa(band_, LV_OPA_COVER, 0);
 
@@ -96,11 +96,11 @@ private:
         lv_obj_t* grid = lv_obj_create(root_);
         lv_obj_remove_style_all(grid);
         lv_obj_remove_flag(grid, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_set_size(grid, lv_pct(100), 56 * 2 + 8);
+        lv_obj_set_size(grid, lv_pct(100), 56 * 2 + 12);
         static const int32_t cols[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
         static const int32_t rows[] = {56, 56, LV_GRID_TEMPLATE_LAST};
         lv_obj_set_grid_dsc_array(grid, cols, rows);
-        lv_obj_set_style_pad_row(grid, 8, 0);
+        lv_obj_set_style_pad_row(grid, 12, 0);
         lv_obj_set_style_pad_column(grid, 12, 0);
         const auto* favs = state().list(Kind::Favourites);
         int n = 0;
@@ -120,11 +120,11 @@ private:
     void middle(const std::optional<core::MediaItem>& now) {
         lv_obj_t* r = kit::row(root_, 28);
         lv_obj_set_width(r, lv_pct(100));
-        lv_obj_set_style_margin_top(r, 6, 0);
+        lv_obj_set_style_margin_top(r, 18, 0);  // 32 px between sections, everywhere
         lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
         // "Now on <speaker>": a card in the artwork's colour.
-        lv_obj_t* left = kit::column(r, 8);
+        lv_obj_t* left = kit::column(r, 14);
         lv_obj_set_width(left, 304);
         const core::PlayerState* p = state().selected();
         kit::section_header(left, i18n::tr(i18n::Str::home_now_on, p ? p->name : ""));
@@ -172,7 +172,7 @@ private:
         }
 
         // Recently played (or your playlists if nothing was played yet).
-        lv_obj_t* right = kit::column(r, 8);
+        lv_obj_t* right = kit::column(r, 14);
         lv_obj_set_flex_grow(right, 1);
         lv_obj_set_width(right, 1);
         kit::section_header(right, tr(i18n::Str::home_recently_played), tr(i18n::Str::home_see_all), [] { open(ScreenId::Library); });
@@ -198,7 +198,8 @@ private:
         if (filter_ == Filter::Music) return;
         const auto* radio = state().list(Kind::LibraryRadio);
         if (!radio || radio->items.empty()) return;
-        kit::section_header(root_, tr(i18n::Str::home_stations), tr(i18n::Str::home_see_all), [] { open(ScreenId::Library); });
+        lv_obj_t* sh = kit::section_header(root_, tr(i18n::Str::home_stations), tr(i18n::Str::home_see_all), [] { open(ScreenId::Library); });
+        lv_obj_set_style_margin_top(sh, 18, 0);
         lv_obj_t* row = kit::row(root_, 12);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         for (size_t i = 0; i < radio->items.size() && i < 7; ++i) {

@@ -25,7 +25,7 @@ struct Shell {
     lv_obj_t* progress = nullptr;  // player bar progress (animated between 1 Hz ticks)
     lv_obj_t* elapsed = nullptr;
     core::MediaItem detail;
-    SettingsPage page = SettingsPage::Display;
+    SettingsPage page = SettingsPage::Appearance;
     lv_obj_t* ambient = nullptr;
     lv_obj_t* ambient_clock = nullptr;
     bool touches_hooked = false;
@@ -129,28 +129,6 @@ void build_sidebar() {
     lv_obj_clean(s.side);
     ScreenId tab = screen(s.current).tab();
 
-    // Speaker: which one plays, and whether it plays.
-    const core::PlayerState* p = s.state.selected();
-    lv_obj_t* spk = kit::row(s.side, 10);
-    lv_obj_set_size(spk, lv_pct(100), 48);
-    lv_obj_set_style_margin_bottom(spk, 14, 0);
-    lv_obj_set_style_pad_hor(spk, 12, 0);
-    lv_obj_set_style_radius(spk, theme::r_control(), 0);
-    lv_obj_set_style_border_width(spk, 1, 0);
-    lv_obj_set_style_border_color(spk, theme::border(), 0);
-    lv_obj_set_style_bg_color(spk, theme::surface(), LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(spk, LV_OPA_COVER, LV_STATE_PRESSED);
-    kit::icon(spk, icon::speaker, 22, theme::text2());
-    lv_obj_t* col = kit::column(spk, 0);
-    lv_obj_set_flex_grow(col, 1);
-    lv_obj_set_width(col, 1);
-    kit::text(col, p ? p->name : tr(i18n::Str::speaker_none), theme::label(), theme::text());
-    lv_obj_t* st = kit::row(col, 6);
-    if (s.state.playing()) kit::equalizer(st, theme::accent(), true);
-    kit::text(st, tr(s.state.playing() ? i18n::Str::side_playing : i18n::Str::side_idle), theme::label(), theme::text3());
-    kit::icon(spk, icon::chevron_down, 22, theme::text3());
-    kit::on_click(spk, [] { open_speakers(); });
-
     struct Item { ScreenId id; const char* glyph; i18n::Str label; };
     for (const Item& it : {Item{ScreenId::Home, icon::home, i18n::Str::nav_home}, Item{ScreenId::Search, icon::search, i18n::Str::nav_search},
                            Item{ScreenId::Library, icon::library, i18n::Str::nav_library}, Item{ScreenId::Queue, icon::queue, i18n::Str::nav_queue}}) {
@@ -196,7 +174,7 @@ void refresh_bar() {
     const core::PlayerState* p = s.state.selected();
 
     lv_obj_t* info = kit::row(s.bar, 14);
-    lv_obj_set_width(info, 340);
+    lv_obj_set_width(info, 320);
     if (item) {
         kit::art(info, *item, 64, theme::r_art(), theme::side());
         lv_obj_t* col = kit::column(info, 2);
@@ -207,15 +185,25 @@ void refresh_bar() {
         kit::text(sub, kit::subtitle(*item), theme::label(), theme::text2());
         kit::badge(sub, item->badge_provider());
         kit::on_click(info, [] { open(ScreenId::NowPlaying); });
-    } else {
-        kit::text(info, tr(i18n::Str::home_nothing_playing), theme::meta(), theme::text3());
+    } else {  // same shape as when playing, so nothing jumps when music starts
+        lv_obj_t* ph = kit::row(info, 0);
+        lv_obj_set_size(ph, 64, 64);
+        lv_obj_set_style_radius(ph, theme::r_art(), 0);
+        lv_obj_set_style_bg_color(ph, theme::surface(), 0);
+        lv_obj_set_style_bg_opa(ph, LV_OPA_COVER, 0);
+        lv_obj_set_flex_align(ph, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        kit::icon(ph, icon::album, 28, theme::text3());
+        lv_obj_t* col = kit::column(info, 2);
+        lv_obj_set_flex_grow(col, 1);
+        lv_obj_set_width(col, 1);
+        kit::text(col, tr(i18n::Str::home_nothing_playing), theme::meta(), theme::text());
+        kit::text(col, tr(i18n::Str::bar_idle_sub), theme::label(), theme::text3());
     }
 
     lv_obj_t* mid = kit::column(s.bar, 4);
     lv_obj_set_flex_grow(mid, 1);
     lv_obj_set_flex_align(mid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_t* controls = kit::row(mid, 16);
-    if (!item) lv_obj_add_flag(mid, LV_OBJ_FLAG_HIDDEN);  // nothing playing: no controls that do nothing
     bool radio = item && item->type == core::MediaType::Radio;
     const auto* q = s.state.queue.get();
     if (!radio) {
@@ -233,9 +221,28 @@ void refresh_bar() {
                          [next] { send(app::cmd::SetRepeat{next}); }, 48, 22, false,
                          mode == core::RepeatMode::Off ? theme::text3() : theme::accent());
     }
+    if (!item) {  // nothing playing: controls shown but dimmed and inert (WCAG: disabled, not hidden)
+        lv_obj_set_style_opa(controls, LV_OPA_40, 0);
+        for (uint32_t i = 0; i < lv_obj_get_child_count(controls); ++i) {
+            lv_obj_t* b = lv_obj_get_child(controls, i);
+            lv_obj_add_state(b, LV_STATE_DISABLED);
+            lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
+        }
+        lv_obj_t* prog = kit::row(mid, 10);
+        lv_obj_set_width(prog, 440);
+        lv_obj_set_style_opa(prog, LV_OPA_40, 0);
+        kit::text(prog, "0:00", theme::label(), theme::text3());
+        lv_obj_t* track = kit::row(prog, 0);
+        lv_obj_set_flex_grow(track, 1);
+        lv_obj_set_height(track, 4);
+        lv_obj_set_style_radius(track, 2, 0);
+        lv_obj_set_style_bg_color(track, theme::elevated(), 0);
+        lv_obj_set_style_bg_opa(track, LV_OPA_COVER, 0);
+        kit::text(prog, "0:00", theme::label(), theme::text3());
+    }
     if (item && !radio && item->duration_s) {
         lv_obj_t* prog = kit::row(mid, 10);
-        lv_obj_set_width(prog, 460);
+        lv_obj_set_width(prog, 440);
         s.elapsed = kit::text(prog, duration(s.state.elapsed_s), theme::label(), theme::text3());
         s.progress = lv_bar_create(prog);
         lv_obj_set_flex_grow(s.progress, 1);
@@ -248,16 +255,32 @@ void refresh_bar() {
         kit::text(prog, duration(item->duration_s), theme::label(), theme::text3());
     }
 
-    lv_obj_t* right = kit::row(s.bar, 10);
-    lv_obj_set_width(right, 340);
+    lv_obj_t* right = kit::row(s.bar, 8);
+    lv_obj_set_width(right, 400);
     lv_obj_set_style_pad_right(right, 12, 0);  // room for the volume knob at 100 %
     lv_obj_set_flex_align(right, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     kit::icon_button(right, icon::queue, [] { open(ScreenId::Queue); }, 48, 22, false, theme::text2());
+    // Speaker (Spotify-style "playing on"): icon + name; tap = pick or group speakers.
+    lv_obj_t* spk = kit::row(right, 8);
+    lv_obj_set_height(spk, 40);
+    lv_obj_set_ext_click_area(spk, 8);
+    lv_obj_set_style_pad_hor(spk, 12, 0);
+    lv_obj_set_style_radius(spk, theme::r_control(), 0);
+    lv_obj_set_style_border_width(spk, 1, 0);
+    lv_obj_set_style_border_color(spk, theme::border(), 0);
+    lv_obj_set_style_bg_color(spk, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(spk, LV_OPA_COVER, LV_STATE_PRESSED);
+    lv_color_t spk_fg = s.state.playing() ? theme::accent() : theme::text2();
+    if (s.state.playing()) kit::equalizer(spk, spk_fg, true);
+    else kit::icon(spk, icon::speaker, 20, spk_fg);
+    lv_obj_t* spk_name = kit::text(spk, p ? p->name : tr(i18n::Str::speaker_none), theme::label(), spk_fg);
+    lv_obj_set_style_max_width(spk_name, 120, 0);
+    kit::on_click(spk, [] { open_speakers(); });
     kit::icon_button(right, icon::volume, [] { open_volume(); }, 48, 22, false, theme::text2());
     if (p && p->can_set_volume) {
         std::string id = p->player_id;
         lv_obj_t* vol = kit::slider(right, p->volume_level, [id](int v) { send(app::cmd::SetVolume{id, v}); }, theme::text2());
-        lv_obj_set_width(vol, 140);
+        lv_obj_set_width(vol, 112);
     }
 }
 
@@ -309,6 +332,31 @@ void apply_diagnostics() {
             if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, on_touch, LV_EVENT_PRESSED, nullptr);
         s.touches_hooked = true;
     }
+}
+
+// What the screens draw from players / the queue; equal signatures = nothing visible changed.
+std::string signature(const app::PlayersView& v) {
+    std::string k = v.selected_id;
+    for (const auto& p : v.players) {
+        k += '|' + p.player_id + ',' + p.name + ',' + std::to_string(static_cast<int>(p.state)) + ',' +
+             std::to_string(p.volume_level) + ',' + std::to_string(p.group_volume) + ',' + (p.available ? '1' : '0') +
+             (p.can_seek ? '1' : '0') + (p.can_next_previous ? '1' : '0') + (p.can_set_volume ? '1' : '0') +
+             (p.can_pause ? '1' : '0') + ',' + p.synced_to + ',' + p.media_title + ',' + p.media_artist + ',' + p.media_image_url;
+        for (const auto& m : p.group_members) k += ';' + m;
+        k += '/';
+        for (const auto& m : p.can_group_with) k += ';' + m;
+    }
+    return k;
+}
+
+std::string signature(const core::QueueState& q) {
+    auto item = [](const core::QueueItem& i) {
+        return i.queue_item_id + ',' + i.name + ',' + (i.media ? i.media->uri + (i.media->favorite ? "*" : "") : "");
+    };
+    std::string k = q.queue_id + '|' + std::to_string(q.current_index) + (q.shuffle ? "s" : "") +
+                    std::to_string(static_cast<int>(q.repeat)) + '|' + (q.current ? item(*q.current) : "");
+    for (const auto& i : q.items) k += '|' + item(i);
+    return k;
 }
 
 void tick_progress(lv_timer_t*) {
@@ -389,8 +437,7 @@ SettingsPage settings_page() { return shell().page; }
 
 void open_settings_page(SettingsPage page) {
     shell().page = page;
-    if (shell().current == ScreenId::SettingsPage) return show(ScreenId::SettingsPage);
-    open(ScreenId::SettingsPage);
+    open(ScreenId::Settings);
 }
 
 std::string clock_text(int minutes) {
@@ -554,7 +601,6 @@ void start(Send send_fn) {
     s.screens.push_back(make_settings());
     s.screens.push_back(make_now_playing());
     s.screens.push_back(make_detail());
-    s.screens.push_back(make_settings_page());
     s.screens.push_back(make_setup());
     s.screens.push_back(make_boot());
     build_all();
@@ -592,11 +638,20 @@ void apply(app::Update update) {
         apply_diagnostics();
         topic = Topic::Panel;
     } else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&update)) {
+        bool same = s.state.players && signature(**p) == signature(*s.state.players);
         s.state.players = *p;
+        if (same) return;  // MA repeats player_updated (elapsed time, other fields we don't show)
         topic = Topic::Players;
     } else if (auto* q = std::get_if<std::shared_ptr<const core::QueueState>>(&update)) {
+        bool same = s.state.queue && signature(**q) == signature(*s.state.queue);
         s.state.queue = *q;
         s.state.elapsed_s = (*q)->elapsed_s;
+        if (same) {  // only the time moved: no rebuild (it reset scroll and re-faded every cover)
+            screen(s.current).refresh(Topic::Progress);
+            if (s.progress) lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_ON);
+            if (s.elapsed) lv_label_set_text(s.elapsed, duration(s.state.elapsed_s).c_str());
+            return;
+        }
         topic = Topic::Queue;
     } else if (auto* sv = std::get_if<std::shared_ptr<const core::SearchView>>(&update)) {
         s.state.search = *sv;
@@ -616,7 +671,13 @@ void apply(app::Update update) {
         show(s.current);
         return;
     }
+    lv_obj_t* root = s.roots[static_cast<size_t>(s.current)];
+    int32_t y = lv_obj_get_scroll_y(root);
     screen(s.current).refresh(topic);
+    if (y > 0) {  // a rebuild must not jump the page back to the top
+        lv_obj_update_layout(root);
+        lv_obj_scroll_to_y(root, y, LV_ANIM_OFF);
+    }
     if (topic == Topic::Queue || topic == Topic::Players || topic == Topic::Playlists) {
         build_sidebar();
         refresh_bar();
