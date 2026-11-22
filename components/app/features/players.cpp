@@ -33,6 +33,19 @@ public:
         if (auto* s = std::get_if<cmd::SelectPlayer>(&c)) {
             ctx_.settings.set("player", s->player_id);
             select(s->player_id);
+        } else if (auto* g = std::get_if<cmd::SetGroup>(&c)) {
+            // Send only the difference with the current group.
+            auto it = find(g->leader);
+            std::vector<std::string> now = it != view_.players.end() ? it->group_members : std::vector<std::string>{};
+            auto has = [](const std::vector<std::string>& v, const std::string& id) { return std::find(v.begin(), v.end(), id) != v.end(); };
+            std::vector<std::string> add, remove;
+            for (const auto& id : g->members)
+                if (id != g->leader && !has(now, id)) add.push_back(id);
+            for (const auto& id : now)
+                if (id != g->leader && !has(g->members, id)) remove.push_back(id);
+            if (!add.empty() || !remove.empty()) ctx_.send(ma::cmd::set_members(g->leader, add, remove));
+        } else if (auto* u = std::get_if<cmd::Ungroup>(&c)) {
+            ctx_.send(ma::cmd::ungroup(u->player_id));
         } else if (auto* v = std::get_if<cmd::SetVolume>(&c)) {
             int level = std::clamp(v->level, 0, 100);
             auto it = find(v->player_id);

@@ -336,16 +336,28 @@ static void test_app_with_mock() {
         if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
     CHECK(q && q->items.size() + 1 == before);
 
+    // Grouping: Kitchen joins Living Room, then the group is dissolved.
+    a.handle(app::cmd::SetGroup{"living", {"kitchen"}});
+    run_until(3480);
+    for (auto& u : updates)
+        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
+    CHECK(players && players->players[0].group_members.size() == 2 && players->players[1].synced_to == "living");
+    a.handle(app::cmd::Ungroup{"living"});
+    run_until(3560);
+    for (auto& u : updates)
+        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
+    CHECK(players && players->players[0].group_members.empty() && players->players[1].synced_to.empty());
+
     // Volume is clamped and reflected.
     a.handle(app::cmd::SetVolume{"living", 140});
-    run_until(3500);
+    run_until(3640);
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
     CHECK(players && players->players[0].volume_level == 100);
 
     // Playlists: list (editable flag parsed), add a song, create one.
     a.handle(app::cmd::LoadPlaylists{});
-    run_until(3700);
+    run_until(3800);
     std::shared_ptr<const app::PlaylistsView> pls;
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlaylistsView>>(&u)) pls = *p;
@@ -354,7 +366,7 @@ static void test_app_with_mock() {
     updates.clear();
     a.handle(app::cmd::AddToPlaylist{pls->playlists[0], viva});
     a.handle(app::cmd::CreatePlaylist{"Kitchen songs", viva});
-    run_until(4100);
+    run_until(4200);
     std::vector<std::string> toasts;
     for (auto& u : updates)
         if (auto* t = std::get_if<app::Toast>(&u)) toasts.push_back(t->text);

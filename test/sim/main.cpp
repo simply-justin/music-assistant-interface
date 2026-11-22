@@ -216,6 +216,14 @@ int main(int argc, char** argv) {
     shot("12_favourite_preview");
     ui::open(ui::ScreenId::Settings);
     shot("13_settings");
+    // Tap test: the name, the status line and empty space in the Kitchen row must all hit the row.
+    {
+        lv_point_t pts[] = {{379, 219}, {379, 240}, {560, 228}};
+        lv_obj_t* hit[3];
+        for (int i = 0; i < 3; ++i) hit[i] = lv_indev_search_obj(lv_screen_active(), &pts[i]);
+        bool same = hit[0] && hit[0] == hit[1] && hit[1] == hit[2] && lv_obj_get_width(hit[0]) > 400;
+        std::printf("speaker row tap test: %s (width %d)\n", same ? "PASS" : "FAIL", hit[0] ? (int)lv_obj_get_width(hit[0]) : -1);
+    }
     ui::open_settings_page(ui::SettingsPage::Display);
     shot("14_settings_display");
     ui::open_settings_page(ui::SettingsPage::Server);
@@ -227,6 +235,12 @@ int main(int argc, char** argv) {
     ui::open(ui::ScreenId::Home);
     ui::show_ambient();
     shot("18_ambient");
+    lv_obj_send_event(lv_obj_get_child(lv_layer_top(), -1), LV_EVENT_SHORT_CLICKED, nullptr);  // wake
+    run(200);
+    ui::open_group("living");
+    shot("18b_group");
+    ui::open_speakers();
+    shot("18c_speakers");
     lv_obj_send_event(lv_obj_get_child(lv_layer_top(), -1), LV_EVENT_SHORT_CLICKED, nullptr);  // wake
     core.handle(app::cmd::SetLanguage{i18n::Lang::nl});
     run(300);

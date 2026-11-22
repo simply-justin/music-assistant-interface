@@ -71,7 +71,9 @@ struct PlayerState {
     bool available = true;
     // From `supported_features`. The UI hides controls whose flag is false.
     bool can_seek = false, can_next_previous = false, can_set_volume = false, can_pause = false;
-    std::vector<std::string> group_members;  // player_ids; empty = not a group
+    std::vector<std::string> group_members;  // player_ids (incl. the leader); empty = not a group
+    std::vector<std::string> can_group_with;  // players this one can be grouped with (MA decides)
+    std::string synced_to;                    // set when this player is a member of someone's group
     // `current_media`: also carries radio stream metadata.
     std::string media_title, media_artist, media_image_url;
 };

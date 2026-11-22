@@ -84,6 +84,9 @@ lv_obj_t* card(lv_obj_t* parent, const std::string& title = {});
 // A tappable settings/list row: icon, title, optional subtitle, optional chevron.
 lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
                   bool chevron = true);
+// A speaker as a fully tappable row: radio dot, name, live status, optional "Group" button.
+lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected, bool show_group);
+void open_group(const std::string& leader_id);
 // Warning banner (offline, provider down, playback error).
 lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& body);
 lv_obj_t* speaker_chip(lv_obj_t* parent);

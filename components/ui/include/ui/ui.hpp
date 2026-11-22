@@ -36,6 +36,7 @@ void open_volume();
 void open_track_menu(const core::MediaItem& item);
 void open_settings_page(SettingsPage page);
 void open_favourite_preview(const core::MediaItem& item);
-void show_ambient();  // the dimmed clock (normally after the idle timeout)
+void show_ambient();  // the sleep screen (normally after the idle timeout)
+void open_group(const std::string& leader_id);  // speaker grouping sheet
 
 }  // namespace ui

@@ -47,9 +47,9 @@ constexpr const char* kCatalog = R"json([
 
 constexpr const char* kPlayers = R"json([
  {"player_id":"living","name":"Living Room","playback_state":"playing","volume_level":42,"available":true,
-  "supported_features":["pause","seek","next_previous","volume_set"]},
+  "supported_features":["pause","seek","next_previous","volume_set","set_members"],"can_group_with":["kitchen"],"group_members":[]},
  {"player_id":"kitchen","name":"Kitchen","playback_state":"idle","volume_level":30,"available":true,
-  "supported_features":["pause","volume_set"]}
+  "supported_features":["pause","volume_set","set_members"],"can_group_with":["living"],"group_members":[]}
 ])json";
 
 const char* list_key(const std::string& media_type) {
@@ -258,6 +258,49 @@ Response MockBackend::handle(const Request& req) {
         }
         cJSON_DeleteItemFromArray(queue_.get(), i);
         emit("queue_items_updated", json_str(args, "queue_id"), nullptr);
+    } else if (c == "players/cmd/set_members" || c == "players/cmd/ungroup") {
+        auto by_id = [this](const std::string& id) -> cJSON* {
+            cJSON* p;
+            cJSON_ArrayForEach(p, players_.get()) if (json_str(p, "player_id") == id) return p;
+            return nullptr;
+        };
+        auto set_list = [](cJSON* p, const char* key, const std::vector<std::string>& ids) {
+            cJSON* arr = cJSON_CreateArray();
+            for (const auto& id : ids) cJSON_AddItemToArray(arr, cJSON_CreateString(id.c_str()));
+            cJSON_ReplaceItemInObjectCaseSensitive(p, key, arr);
+        };
+        auto set_synced = [](cJSON* p, const std::string& to) {
+            if (!cJSON_GetObjectItemCaseSensitive(p, "synced_to")) cJSON_AddNullToObject(p, "synced_to");
+            cJSON_ReplaceItemInObjectCaseSensitive(p, "synced_to", to.empty() ? cJSON_CreateNull() : cJSON_CreateString(to.c_str()));
+        };
+        if (c == "players/cmd/ungroup") {
+            std::string id = json_str(args, "player_id");
+            cJSON* p;
+            cJSON_ArrayForEach(p, players_.get()) {
+                std::string pid = json_str(p, "player_id");
+                if (pid == id || json_str(p, "synced_to") == id) set_synced(p, "");
+                if (pid == id) set_list(p, "group_members", {});
+            }
+        } else {
+            std::string leader = json_str(args, "target_player");
+            cJSON* lp = by_id(leader);
+            std::vector<std::string> members;
+            const cJSON* m;
+            cJSON_ArrayForEach(m, cJSON_GetObjectItemCaseSensitive(lp, "group_members")) members.emplace_back(m->valuestring);
+            if (members.empty()) members.push_back(leader);
+            cJSON_ArrayForEach(m, cJSON_GetObjectItemCaseSensitive(args, "player_ids_to_add")) {
+                members.emplace_back(m->valuestring);
+                if (cJSON* mp = by_id(m->valuestring)) set_synced(mp, leader);
+            }
+            cJSON_ArrayForEach(m, cJSON_GetObjectItemCaseSensitive(args, "player_ids_to_remove")) {
+                members.erase(std::remove(members.begin(), members.end(), std::string(m->valuestring)), members.end());
+                if (cJSON* mp = by_id(m->valuestring)) set_synced(mp, "");
+            }
+            if (members.size() == 1) members.clear();
+            set_list(lp, "group_members", members);
+        }
+        cJSON* p;
+        cJSON_ArrayForEach(p, players_.get()) emit("player_updated", json_str(p, "player_id"), Json(cJSON_Duplicate(p, true)));
     } else if (c == "players/cmd/volume_set") {
         std::string id = json_str(args, "player_id");
         cJSON* p;

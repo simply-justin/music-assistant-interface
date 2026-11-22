@@ -1,5 +1,6 @@
 // Home (direction A): greeting + filter, 8 one-tap shortcut tiles, "Now on <speaker>",
 // recently played, your stations. A flat tint from the current artwork sits behind the top.
+#include <algorithm>
 #include <ctime>
 
 #include "../shell.hpp"
@@ -47,6 +48,7 @@ private:
         // Flat tint from the current artwork behind the top of the page (follows the music).
         band_ = lv_obj_create(root_);
         lv_obj_remove_style_all(band_);
+        lv_obj_remove_flag(band_, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_flag(band_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_pos(band_, -theme::kPad, -20);
         lv_obj_set_size(band_, theme::kScreenW - theme::kSideW, 20 + 48 + 14 + 120 + 24);  // header + tiles + margin
@@ -65,25 +67,35 @@ private:
         std::time_t now = std::time(nullptr);
         int hour = std::localtime(&now)->tm_hour;
         auto greeting = hour < 12 ? i18n::Str::home_morning : hour < 18 ? i18n::Str::home_afternoon : i18n::Str::home_evening;
-        lv_obj_t* g = kit::text(h, tr(greeting), theme::h1(), theme::text());
-        lv_obj_set_style_margin_right(g, 18, 0);
+        kit::text(h, tr(greeting), theme::h1(), theme::text());
+        kit::spacer(h);
+        if (state().ever_connected && !state().connected()) {
+            lv_obj_t* w = kit::text(h, tr(i18n::Str::home_reconnecting), theme::meta(), theme::warning());
+            lv_obj_set_style_margin_right(w, 24, 0);
+        }
+        // Filter tabs, right-aligned: they filter every section below.
         struct F { Filter f; i18n::Str s; };
+        lv_obj_t* last = nullptr;
         for (F x : {F{Filter::All, i18n::Str::filter_all}, F{Filter::Music, i18n::Str::home_music}, F{Filter::Radio, i18n::Str::filter_radio}}) {
             Filter f = x.f;
-            kit::pill(h, tr(x.s), filter_ == f, [this, f] {
+            last = kit::tab(h, tr(x.s), filter_ == f, [this, f] {
                 filter_ = f;
                 kit::later([this] { rebuild(); });
             });
         }
-        kit::spacer(h);
-        if (state().ever_connected && !state().connected())
-            kit::text(h, tr(i18n::Str::home_reconnecting), theme::meta(), theme::warning());
+        lv_obj_set_style_margin_right(last, 0, 0);  // flush with the right edge
+    }
+
+    bool keep(const core::MediaItem& m) const {
+        bool radio = m.type == core::MediaType::Radio;
+        return filter_ == Filter::All || (filter_ == Filter::Radio) == radio;
     }
 
     // 4 × 2 one-tap favourites; long-press opens the preview.
     void shortcuts() {
         lv_obj_t* grid = lv_obj_create(root_);
         lv_obj_remove_style_all(grid);
+        lv_obj_remove_flag(grid, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_size(grid, lv_pct(100), 56 * 2 + 8);
         static const int32_t cols[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
         static const int32_t rows[] = {56, 56, LV_GRID_TEMPLATE_LAST};
@@ -94,8 +106,7 @@ private:
         int n = 0;
         for (size_t i = 0; favs && i < favs->items.size() && n < 8; ++i) {
             const auto& f = favs->items[i];
-            bool radio = f.type == core::MediaType::Radio;
-            if ((filter_ == Filter::Music && radio) || (filter_ == Filter::Radio && !radio)) continue;
+            if (!keep(f)) continue;
             lv_obj_t* t = kit::favourite_tile(grid, f, [f] { play(f); }, [f] { open_favourite_preview(f); });
             lv_obj_set_grid_cell(t, LV_GRID_ALIGN_STRETCH, n % 4, 1, LV_GRID_ALIGN_STRETCH, n / 4, 1);
             ++n;
@@ -169,7 +180,8 @@ private:
         lv_obj_set_flex_align(cards, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
         std::vector<core::MediaItem> items;
         if (const auto* recent = state().list(Kind::RecentlyPlayed)) items = recent->items;
-        if (items.empty() && state().playlists) items = state().playlists->playlists;
+        if (items.empty() && state().playlists && filter_ != Filter::Radio) items = state().playlists->playlists;
+        items.erase(std::remove_if(items.begin(), items.end(), [this](const core::MediaItem& m) { return !keep(m); }), items.end());
         for (size_t i = 0; i < items.size() && i < 4; ++i) {
             const auto& it = items[i];
             kit::media_card(cards, it, kit::subtitle(it), [it] { open_item(it); }, 128);

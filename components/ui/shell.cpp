@@ -402,31 +402,35 @@ std::string clock_text(int minutes) {
 lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
     lv_obj_t* c = kit::column(parent, 12);
     lv_obj_set_width(c, lv_pct(100));
-    lv_obj_set_style_pad_all(c, 24, 0);
+    lv_obj_set_style_pad_hor(c, 12, 0);
+    lv_obj_set_style_pad_ver(c, 16, 0);
+    lv_obj_set_style_pad_row(c, 2, 0);
     lv_obj_set_style_radius(c, theme::r_card(), 0);
-    lv_obj_set_style_border_width(c, 1, 0);
-    lv_obj_set_style_border_color(c, theme::hairline(), 0);
-    if (!title.empty()) kit::overline(c, title);
+    lv_obj_set_style_bg_color(c, theme::surface(), 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    if (!title.empty()) {
+        lv_obj_t* t = kit::overline(c, title, theme::text2());
+        lv_obj_set_style_pad_left(t, 12, 0);
+        lv_obj_set_style_pad_bottom(t, 6, 0);
+    }
     return c;
 }
 
 lv_obj_t* nav_row(lv_obj_t* parent, const char* glyph, const std::string& title, const std::string& sub, kit::Action action,
                   bool chevron) {
     lv_obj_t* r = kit::row(parent, 16);
-    lv_obj_set_size(r, lv_pct(100), sub.empty() ? 64 : 76);
-    lv_obj_set_style_pad_hor(r, 8, 0);
-    lv_obj_set_style_border_side(r, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_width(r, 1, 0);
-    lv_obj_set_style_border_color(r, theme::hairline(), 0);
-    lv_obj_set_style_bg_color(r, theme::surface(), LV_STATE_PRESSED);
+    lv_obj_set_size(r, lv_pct(100), sub.empty() ? 60 : 68);
+    lv_obj_set_style_pad_hor(r, 12, 0);
+    lv_obj_set_style_radius(r, theme::r_control(), 0);
+    lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
     lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
-    if (glyph) kit::icon(r, glyph, 28, theme::text2());
-    lv_obj_t* col = kit::column(r, 4);
+    if (glyph) kit::icon(r, glyph, 26, theme::text2());
+    lv_obj_t* col = kit::column(r, 2);
     lv_obj_set_flex_grow(col, 1);
     lv_obj_set_width(col, 1);
-    kit::text(col, title, theme::body(), theme::text());
-    if (!sub.empty()) kit::text(col, sub, theme::meta(), theme::text2());
-    if (chevron) kit::icon(r, icon::chevron_right, 28, theme::text3());
+    kit::text(col, title, theme::meta(), theme::text());
+    if (!sub.empty()) kit::text(col, sub, theme::label(), theme::text2());
+    if (chevron) kit::icon(r, icon::chevron_right, 22, theme::text3());
     kit::on_click(r, std::move(action));
     return r;
 }
@@ -459,34 +463,46 @@ void show_ambient() {
     lv_obj_t* a = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(a);
     lv_obj_set_size(a, theme::kScreenW, theme::kScreenH);
-    lv_obj_set_style_bg_color(a, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(a, lv_color_black(), 0);  // always black: it's the sleep screen, in both themes
     lv_obj_set_style_bg_opa(a, LV_OPA_COVER, 0);
-    lv_obj_set_flex_flow(a, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(a, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(a, 12, 0);
     lv_obj_add_flag(a, LV_OBJ_FLAG_CLICKABLE);  // swallows the waking tap
     s.ambient = a;
     s.ambient_clock = nullptr;
-    lv_color_t fg = night ? theme::text3() : theme::text();
+    // Fixed dark-theme colours (the panel may be in light mode); dimmer at night.
+    lv_color_t fg = night ? lv_color_hex(0x8F8F8F) : lv_color_white();
+    lv_color_t fg2 = night ? lv_color_hex(0x6E6E6E) : lv_color_hex(0xA3A3A3);
+
     if (clock) {
+        // Bottom-left: the time, the date under it.
         std::time_t t = std::time(nullptr);
         std::tm* lt = std::localtime(&t);
-        s.ambient_clock = kit::text(a, clock_text(lt->tm_hour * 60 + lt->tm_min), theme::clock(), fg);
+        lv_obj_t* left = kit::column(a, 14);
+        lv_obj_align(left, LV_ALIGN_BOTTOM_LEFT, 72, -64);
+        s.ambient_clock = kit::text(left, clock_text(lt->tm_hour * 60 + lt->tm_min), theme::clock(), fg);
+        lv_obj_set_style_text_letter_space(s.ambient_clock, -4, 0);
         std::string date = std::string(tr(static_cast<i18n::Str>(static_cast<int>(i18n::Str::day_0) + lt->tm_wday))) + " " +
                            std::to_string(lt->tm_mday) + " " +
                            tr(static_cast<i18n::Str>(static_cast<int>(i18n::Str::month_1) + lt->tm_mon));
-        kit::text(a, date, theme::h2(), night ? theme::text3() : theme::text2());
+        lv_obj_t* d = kit::text(left, date, theme::h2(), fg2);
+        lv_obj_set_style_pad_left(d, 8, 0);
+
+        // Bottom-right: what's playing (no cover at night: a bright cover in a dark room glares).
         if (auto item = s.state.now_playing(); item && s.state.playing()) {
-            lv_obj_t* np = kit::row(a, 12);
-            lv_obj_set_style_pad_top(np, 48, 0);
-            kit::icon(np, icon::volume, 22, theme::text3());
+            lv_obj_t* np = kit::row(a, 20);
+            lv_obj_align(np, LV_ALIGN_BOTTOM_RIGHT, -72, -80);
+            if (!night) kit::art(np, *item, 120, theme::r_art(), lv_color_black());
+            lv_obj_t* col = kit::column(np, 6);
+            lv_obj_set_width(col, 300);
+            lv_obj_t* who = kit::row(col, 8);
+            kit::equalizer(who, fg2, !night);
             const core::PlayerState* pl = s.state.selected();
-            kit::text(np, item->name + " · " + kit::subtitle(*item) + (pl ? " · " + pl->name : ""), theme::lead(), theme::text3());
+            kit::text(who, pl ? pl->name : "", theme::label(), fg2);
+            kit::text(col, item->name, theme::h2(), fg);
+            kit::text(col, kit::subtitle(*item), theme::meta(), fg2);
         }
     }
-    lv_obj_t* hint = kit::text(a, tr(i18n::Str::ambient_tap), theme::label(), lv_color_hex(0x4A5260));
-    lv_obj_add_flag(hint, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -32);
+    lv_obj_t* hint = kit::text(a, tr(i18n::Str::ambient_tap), theme::label(), lv_color_hex(0x4A4A4A));
+    lv_obj_align(hint, LV_ALIGN_TOP_RIGHT, -40, 32);
     send(app::cmd::SetDimmed{true});
     kit::on_click(a, [] {
         auto& sh = shell();

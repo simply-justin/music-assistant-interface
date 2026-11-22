@@ -135,6 +135,22 @@ Request queue_play_index(const std::string& q, int index) {
 
 Request players_all() { return {"players/all", nullptr}; }
 
+Request set_members(const std::string& target, const std::vector<std::string>& add, const std::vector<std::string>& remove) {
+    Request r = make("players/cmd/set_members");
+    cJSON_AddStringToObject(r.args.get(), "target_player", target.c_str());
+    cJSON* a = cJSON_AddArrayToObject(r.args.get(), "player_ids_to_add");
+    for (const auto& id : add) cJSON_AddItemToArray(a, cJSON_CreateString(id.c_str()));
+    cJSON* rm = cJSON_AddArrayToObject(r.args.get(), "player_ids_to_remove");
+    for (const auto& id : remove) cJSON_AddItemToArray(rm, cJSON_CreateString(id.c_str()));
+    return r;
+}
+
+Request ungroup(const std::string& player_id) {
+    Request r = make("players/cmd/ungroup");
+    cJSON_AddStringToObject(r.args.get(), "player_id", player_id.c_str());
+    return r;
+}
+
 Request music_providers() {
     Request r = make("providers");
     cJSON_AddStringToObject(r.args.get(), "provider_type", "music");
@@ -342,6 +358,11 @@ core::PlayerState player(const cJSON* o) {
     cJSON_ArrayForEach(member, cJSON_GetObjectItemCaseSensitive(o, "group_members")) {
         if (cJSON_IsString(member)) p.group_members.emplace_back(member->valuestring);
     }
+    const cJSON* peer;
+    cJSON_ArrayForEach(peer, cJSON_GetObjectItemCaseSensitive(o, "can_group_with")) {
+        if (cJSON_IsString(peer)) p.can_group_with.emplace_back(peer->valuestring);
+    }
+    p.synced_to = json_str(o, "synced_to");
     const cJSON* media = cJSON_GetObjectItemCaseSensitive(o, "current_media");
     if (cJSON_IsObject(media)) {
         p.media_title = json_str(media, "title");

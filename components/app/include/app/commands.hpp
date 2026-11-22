@@ -55,6 +55,8 @@ struct SetShuffle { bool on; };
 struct SetRepeat { core::RepeatMode mode; };
 struct SelectPlayer { std::string player_id; };
 struct SetVolume { std::string player_id; int level; bool whole_group = false; };  // group = master slider
+struct SetGroup { std::string leader; std::vector<std::string> members; };  // members besides the leader
+struct Ungroup { std::string player_id; };
 struct ClearUpNext {};                               // keeps the current track playing
 struct RemoveFromQueue { std::string queue_item_id; };
 struct MoveInQueue { std::string queue_item_id; int shift; };
@@ -99,7 +101,7 @@ struct PlayerChanged { std::string player_id; };
 }  // namespace cmd
 
 using Command = std::variant<cmd::Search, cmd::Play, cmd::AddToQueue, cmd::PlayPause, cmd::Next, cmd::Previous,
-                             cmd::Seek, cmd::SetShuffle, cmd::SetRepeat, cmd::SelectPlayer, cmd::SetVolume,
+                             cmd::Seek, cmd::SetShuffle, cmd::SetRepeat, cmd::SelectPlayer, cmd::SetVolume, cmd::SetGroup, cmd::Ungroup,
                              cmd::ClearUpNext, cmd::RemoveFromQueue, cmd::MoveInQueue, cmd::PlayQueueIndex,
                              cmd::SetFavourite, cmd::SetLanguage, cmd::Browse, cmd::LoadPlaylists, cmd::AddToPlaylist,
                              cmd::CreatePlaylist, cmd::RemoveFromPlaylist, cmd::DeletePlaylist, cmd::SetupGo,

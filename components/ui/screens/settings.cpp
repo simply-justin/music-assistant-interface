@@ -16,8 +16,9 @@ class Settings : public Screen {
 public:
     void build(lv_obj_t* root) override {
         root_ = root;
-        lv_obj_set_style_pad_all(root, theme::kPad, 0);
-        lv_obj_set_style_pad_row(root, 24, 0);
+        lv_obj_set_style_pad_hor(root, theme::kPad, 0);
+        lv_obj_set_style_pad_top(root, 24, 0);
+        lv_obj_set_style_pad_row(root, 20, 0);
     }
 
     void refresh(Topic t) override {
@@ -32,14 +33,8 @@ public:
         lv_obj_set_flex_grow(speakers, 1);
         lv_obj_set_width(speakers, 1);
         if (const auto* pv = state().players.get()) {
-            for (const auto& p : pv->players) {
-                bool on = p.player_id == pv->selected_id;
-                std::string id = p.player_id;
-                lv_obj_t* r = nav_row(speakers, icon::speaker, p.name, p.available ? "" : tr(i18n::Str::setup_offline),
-                                      [id] { send(app::cmd::SelectPlayer{id}); }, false);
-                if (on) kit::icon(r, icon::check, 28, theme::accent());
-                else lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
-            }
+            for (const auto& p : pv->players) speaker_row(speakers, p, p.player_id == pv->selected_id, true);
+            kit::text(speakers, tr(i18n::Str::settings_speakers_hint), theme::label(), theme::text3(), true);
         }
 
         lv_obj_t* panel = card(cols, tr(i18n::Str::settings_this_panel));

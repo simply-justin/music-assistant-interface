@@ -281,3 +281,15 @@ round_round,Round,Rond
 appearance_motion,Motion,Beweging
 appearance_reduce_motion,Reduce motion,Minder beweging
 appearance_reduce_motion_sub,"No moving equalizer, press or fade effects","Geen bewegende equalizer, druk- of vervaageffecten"
+spk_offline,Offline,Offline
+spk_joined,Playing with {},Speelt mee met {}
+spk_group_with,Group with {},Groep met {}
+spk_playing,Playing · {},Speelt · {}
+spk_group_btn,Group,Groeperen
+group_title,Group speakers,Speakers groeperen
+group_sub,Play the same music as {} on:,Dezelfde muziek als {} afspelen op:
+group_leader,Leads the group,Leidt de groep
+group_save,Save,Opslaan
+group_ungroup,Ungroup,Groep opheffen
+group_none,Music Assistant says this speaker can't be grouped with the others.,Volgens Music Assistant kan deze speaker niet met de andere gegroepeerd worden.
+settings_speakers_hint,Speakers can be grouped when Music Assistant supports it for them (same type).,Speakers kunnen gegroepeerd worden als Music Assistant dat voor ze ondersteunt (zelfde type).

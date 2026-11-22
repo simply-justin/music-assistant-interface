@@ -62,27 +62,159 @@ void volume_row(lv_obj_t* parent, const std::string& name, const std::string& pl
 
 }  // namespace
 
+namespace {
+const core::PlayerState* player_by_id(const std::string& id) {
+    if (!state().players) return nullptr;
+    for (const auto& p : state().players->players)
+        if (p.player_id == id) return &p;
+    return nullptr;
+}
+
+std::string names(const std::vector<std::string>& ids, const std::string& skip) {
+    std::string out;
+    for (const auto& id : ids) {
+        if (id == skip) continue;
+        const core::PlayerState* p = player_by_id(id);
+        out += (out.empty() ? "" : ", ") + (p ? p->name : id);
+    }
+    return out;
+}
+
+std::string status(const core::PlayerState& p) {
+    if (!p.available) return tr(i18n::Str::spk_offline);
+    if (!p.synced_to.empty()) {
+        const core::PlayerState* l = player_by_id(p.synced_to);
+        return i18n::tr(i18n::Str::spk_joined, l ? l->name : p.synced_to);
+    }
+    if (p.group_members.size() > 1) return i18n::tr(i18n::Str::spk_group_with, names(p.group_members, p.player_id));
+    if (p.state == core::PlaybackState::Playing)
+        return p.media_title.empty() ? tr(i18n::Str::side_playing) : i18n::tr(i18n::Str::spk_playing, p.media_title);
+    if (p.state == core::PlaybackState::Paused) return tr(i18n::Str::home_paused);
+    return tr(i18n::Str::side_idle);
+}
+}  // namespace
+
+lv_obj_t* speaker_row(lv_obj_t* parent, const core::PlayerState& p, bool selected, bool show_group) {
+    lv_obj_t* r = kit::row(parent, 14);
+    lv_obj_set_size(r, lv_pct(100), 68);
+    lv_obj_set_style_pad_hor(r, 12, 0);
+    lv_obj_set_style_radius(r, theme::r_control(), 0);
+    lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
+    // Radio indicator: an outlined circle, filled with the accent when selected.
+    lv_obj_t* dot = lv_obj_create(r);
+    lv_obj_remove_style_all(dot);
+    lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(dot, 22, 22);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(dot, selected ? 7 : 2, 0);
+    lv_obj_set_style_border_color(dot, selected ? theme::accent() : theme::text3(), 0);
+    kit::icon(r, icon::speaker, 28, p.available ? theme::text2() : theme::text3());
+    lv_obj_t* col = kit::column(r, 2);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_width(col, 1);
+    kit::text(col, p.name, theme::meta(), p.available ? theme::text() : theme::text3());
+    lv_obj_t* st = kit::row(col, 6);
+    lv_obj_set_width(st, lv_pct(100));
+    if (p.state == core::PlaybackState::Playing && p.available) kit::equalizer(st, theme::accent(), true);
+    lv_obj_t* sl = kit::text(st, status(p), theme::label(), theme::text2());
+    lv_obj_set_flex_grow(sl, 1);
+    lv_obj_set_width(sl, 1);
+    if (show_group && p.available && p.synced_to.empty() && !p.can_group_with.empty()) {
+        std::string id = p.player_id;
+        kit::chip(r, nullptr, tr(i18n::Str::spk_group_btn), p.group_members.size() > 1, [id] { open_group(id); });
+    }
+    std::string id = p.player_id;
+    kit::on_click(r, [id] { send(app::cmd::SelectPlayer{id}); });
+    return r;
+}
+
 void open_speakers() {
     kit::close_sheets();
-    lv_obj_t* s = kit::sheet(640);
+    lv_obj_t* s = kit::sheet(680);
     sheet_header(s, tr(i18n::Str::speakers_title));
     const auto* pv = state().players.get();
     if (!pv) return;
+    lv_obj_t* list = kit::column(s, 0);
+    lv_obj_set_width(list, lv_pct(100));
     for (const auto& p : pv->players) {
-        bool on = p.player_id == pv->selected_id;
-        std::string id = p.player_id;
-        lv_obj_t* r = menu_row(s, icon::speaker, p.name, [id] {
-            send(app::cmd::SelectPlayer{id});
+        lv_obj_t* r = speaker_row(list, p, p.player_id == pv->selected_id, true);
+        kit::on_click(r, [] { kit::close_sheets(); });  // picking a speaker also closes the sheet
+    }
+}
+
+void open_group(const std::string& leader_id) {
+    kit::close_sheets();
+    const core::PlayerState* leader = player_by_id(leader_id);
+    if (!leader) return;
+    lv_obj_t* s = kit::sheet(640);
+    sheet_header(s, tr(i18n::Str::group_title), i18n::tr(i18n::Str::group_sub, leader->name));
+    // Who is ticked: starts as the current group; edited in place (no rebuild under the finger).
+    auto chosen = std::make_shared<std::vector<std::string>>();
+    for (const auto& id : leader->group_members)
+        if (id != leader_id) chosen->push_back(id);
+    lv_obj_t* list = kit::column(s, 0);
+    lv_obj_set_width(list, lv_pct(100));
+    {
+        lv_obj_t* r = kit::row(list, 14);
+        lv_obj_set_size(r, lv_pct(100), 60);
+        lv_obj_set_style_pad_hor(r, 12, 0);
+        kit::icon(r, icon::check, 22, theme::text3());
+        kit::icon(r, icon::speaker, 28, theme::text2());
+        lv_obj_t* c = kit::column(r, 2);
+        kit::text(c, leader->name, theme::meta(), theme::text());
+        kit::text(c, tr(i18n::Str::group_leader), theme::label(), theme::text3());
+    }
+    for (const auto& id : leader->can_group_with) {
+        const core::PlayerState* p = player_by_id(id);
+        if (!p) continue;
+        bool on = std::find(chosen->begin(), chosen->end(), id) != chosen->end();
+        lv_obj_t* r = kit::row(list, 14);
+        lv_obj_set_size(r, lv_pct(100), 60);
+        lv_obj_set_style_pad_hor(r, 12, 0);
+        lv_obj_set_style_radius(r, theme::r_control(), 0);
+        lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
+        lv_obj_t* box = lv_obj_create(r);
+        lv_obj_remove_style_all(box);
+        lv_obj_remove_flag(box, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_size(box, 22, 22);
+        lv_obj_set_style_radius(box, 4, 0);
+        lv_obj_set_style_border_width(box, 2, 0);
+        lv_obj_t* tick = kit::icon(box, icon::check, 22, theme::on_accent());
+        lv_obj_center(tick);
+        auto paint = [box, tick](bool v) {
+            lv_obj_set_style_border_color(box, v ? theme::accent() : theme::text3(), 0);
+            lv_obj_set_style_bg_color(box, theme::accent(), 0);
+            lv_obj_set_style_bg_opa(box, v ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+            if (v) lv_obj_remove_flag(tick, LV_OBJ_FLAG_HIDDEN);
+            else lv_obj_add_flag(tick, LV_OBJ_FLAG_HIDDEN);
+        };
+        paint(on);
+        kit::icon(r, icon::speaker, 28, theme::text2());
+        kit::text(r, p->name, theme::meta(), theme::text());
+        kit::on_click(r, [chosen, id, paint] {
+            auto it = std::find(chosen->begin(), chosen->end(), id);
+            bool now_on = it == chosen->end();
+            if (now_on) chosen->push_back(id);
+            else chosen->erase(it);
+            paint(now_on);
+        });
+    }
+    if (leader->can_group_with.empty()) kit::text(s, tr(i18n::Str::group_none), theme::meta(), theme::text2(), true);
+    lv_obj_t* buttons = kit::row(s, 12);
+    lv_obj_set_width(buttons, lv_pct(100));
+    if (leader->group_members.size() > 1)
+        kit::button(buttons, kit::Button::Ghost, nullptr, tr(i18n::Str::group_ungroup), [leader_id] {
+            send(app::cmd::Ungroup{leader_id});
             kit::close_sheets();
         });
-        if (on) {
-            lv_obj_set_style_bg_color(r, theme::elevated(), 0);
-            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-            kit::spacer(r);
-            kit::icon(r, icon::check, 28, theme::accent());
-        }
-        if (!p.available) lv_obj_set_style_text_color(lv_obj_get_child(r, 1), theme::text3(), 0);
-    }
+    kit::spacer(buttons);
+    kit::button(buttons, kit::Button::Secondary, nullptr, tr(i18n::Str::edit_delete_keep), [] { kit::close_sheets(); });
+    kit::button(buttons, kit::Button::Primary, nullptr, tr(i18n::Str::group_save), [leader_id, chosen] {
+        send(app::cmd::SetGroup{leader_id, *chosen});
+        kit::close_sheets();
+    });
 }
 
 void open_volume() {

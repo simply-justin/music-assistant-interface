@@ -10,9 +10,13 @@ namespace ui::kit {
 
 namespace {
 
+// Plain containers must not catch taps: lv_obj_create makes objects clickable, so a text column
+// inside a row would swallow the tap and the row (the real target) never sees it. on_click()
+// turns clickability back on for the objects that act.
 void remove_style(lv_obj_t* o) {
     lv_obj_remove_style_all(o);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
 }
 
 // Pressed = +12 % white over a dark control, −10 % on a light one (spec §1).
@@ -113,6 +117,7 @@ lv_obj_t* spacer(lv_obj_t* parent) {
 lv_obj_t* scroll_column(lv_obj_t* parent, int32_t gap) {
     lv_obj_t* o = column(parent, gap);
     lv_obj_add_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);  // so a drag on empty space still scrolls
     lv_obj_set_scroll_dir(o, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(o, LV_SCROLLBAR_MODE_OFF);
     return o;
@@ -157,6 +162,7 @@ lv_obj_t* virtual_list(lv_obj_t* parent, size_t count, int32_t row_height, int32
     lv_obj_t* list = lv_obj_create(parent);
     remove_style(list);
     lv_obj_add_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(list, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_scroll_dir(list, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_width(list, lv_pct(100));

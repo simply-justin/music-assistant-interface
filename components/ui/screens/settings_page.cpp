@@ -278,6 +278,7 @@ private:
             // Mini preview of the theme: page, sidebar strip, a cover and two text lines.
             lv_obj_t* pv_box = lv_obj_create(o);
             lv_obj_remove_style_all(pv_box);
+            lv_obj_remove_flag(pv_box, LV_OBJ_FLAG_CLICKABLE);  // the tile around it takes the tap
             lv_obj_set_size(pv_box, 168, 96);
             lv_obj_move_to_index(pv_box, 0);
             lv_obj_set_style_radius(pv_box, theme::r_control(), 0);
@@ -289,6 +290,7 @@ private:
             auto block = [pv_box](int x, int y, int w, int h, uint32_t col, int r) {
                 lv_obj_t* b = lv_obj_create(pv_box);
                 lv_obj_remove_style_all(b);
+                lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
                 lv_obj_set_pos(b, x, y);
                 lv_obj_set_size(b, w, h);
                 lv_obj_set_style_radius(b, r, 0);
@@ -334,6 +336,7 @@ private:
             lv_obj_t* o = option(rounds, tr(names[r]), a.roundness == rr, [a, rr, set] { auto x = a; x.roundness = rr; set(x); });
             lv_obj_t* shape = lv_obj_create(o);
             lv_obj_remove_style_all(shape);
+            lv_obj_remove_flag(shape, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_set_size(shape, 120, 72);
             lv_obj_move_to_index(shape, 0);
             lv_obj_set_style_radius(shape, sample[r], 0);
