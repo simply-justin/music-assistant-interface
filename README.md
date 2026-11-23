@@ -43,7 +43,7 @@ Music Assistant brings Spotify, YouTube Music, radio and your own files together
 Try the panel on your PC; no hardware is needed. You need Linux (or WSL2), CMake, a C++17 compiler, the X11 headers and ESP-IDF 5.5, whose cJSON library the PC build uses.
 
 ```sh
-git clone <this repository> && cd music-assistant-interface
+git clone https://github.com/simply-justin/music-assistant-interface.git && cd music-assistant-interface
 export IDF_PATH=~/esp/v5.5.1/esp-idf
 cmake -S test/sim -B test/sim/build && cmake --build test/sim/build -j
 test/sim/build/music_panel_sim
