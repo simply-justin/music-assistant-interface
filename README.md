@@ -8,6 +8,7 @@
   <img alt="ESP-IDF 5.5" src="https://img.shields.io/badge/ESP--IDF-5.5-E7352C">
   <img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-343839">
   <img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Status: in development" src="https://img.shields.io/badge/status-in%20development-orange">
 </p>
 
@@ -101,4 +102,4 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the code 
 
 ## License
 
-This project does not have a license yet, so all rights are reserved. A license will be added before the first release.
+Released under the [MIT License](LICENSE).
