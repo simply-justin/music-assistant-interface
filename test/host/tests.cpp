@@ -460,7 +460,7 @@ static void test_panel_brightness() {
 static void test_artwork() {
     CHECK(img::proxy_size(52) == 80 && img::proxy_size(160) == 160 && img::proxy_size(224) == 256 && img::proxy_size(520) == 512 && img::proxy_size(600) == 1024);
     core::Image im{"p", "spotify", "abc", true};
-    CHECK(img::proxy_url("http://h:8095", im, 52) == "http://h:8095/imageproxy/abc?size=80");
+    CHECK(img::proxy_url("http://h:8095", im, 52) == "http://h:8095/imageproxy/abc?size=80&fmt=jpeg");
     CHECK(img::proxy_url("http://h:8095", core::Image{}, 52).empty());
     // 4×4 red → 2×2, average red, corners rounded to the background.
     std::vector<uint8_t> red(4 * 4 * 3, 0);

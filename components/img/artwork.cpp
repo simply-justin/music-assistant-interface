@@ -13,7 +13,7 @@ int proxy_size(int px) {
 
 std::string proxy_url(const std::string& base, const core::Image& image, int px) {
     if (image.proxy_id.empty() || base.empty()) return {};
-    return base + "/imageproxy/" + image.proxy_id + "?size=" + std::to_string(proxy_size(px));
+    return base + "/imageproxy/" + image.proxy_id + "?size=" + std::to_string(proxy_size(px)) + "&fmt=jpeg";  // PNG sources (station logos) too: the decoders are JPEG-only
 }
 
 namespace {

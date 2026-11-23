@@ -18,6 +18,7 @@ public:
         lv_obj_set_style_pad_hor(root, theme::kPad, 0);
         lv_obj_set_style_pad_top(root, 20, 0);
         lv_obj_set_style_pad_row(root, 14, 0);
+        lv_obj_set_style_pad_bottom(root, 24, 0);  // room under the last row when the page scrolls
     }
 
     void on_open() override {

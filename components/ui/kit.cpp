@@ -186,6 +186,7 @@ lv_obj_t* virtual_list(lv_obj_t* parent, size_t count, int32_t row_height, int32
 
 lv_obj_t* text(lv_obj_t* parent, const std::string& s, const lv_font_t* font, lv_color_t colour, bool wrap) {
     lv_obj_t* l = lv_label_create(parent);
+    lv_obj_remove_flag(l, LV_OBJ_FLAG_SCROLLABLE);  // a clipped label would take the drag and the page wouldn't scroll
     lv_label_set_text(l, clean(s).c_str());
     lv_obj_set_style_text_font(l, font, 0);
     lv_obj_set_style_text_color(l, colour, 0);

@@ -156,6 +156,17 @@ int main(int argc, char** argv) {
     }
     run(1500);
     shot("01_home");
+    // Scroll check: Home is taller than the screen; its page must scroll to the last row.
+    {
+        lv_point_t pt{700, 300};
+        lv_obj_t* page = lv_indev_search_obj(lv_screen_active(), &pt);
+        while (page && !lv_obj_has_flag(page, LV_OBJ_FLAG_SCROLLABLE)) page = lv_obj_get_parent(page);
+        int32_t room = page ? lv_obj_get_scroll_bottom(page) : 0;
+        if (page) lv_obj_scroll_to_y(page, LV_COORD_MAX, LV_ANIM_OFF);
+        std::printf("home scroll test: %s (%d px below the fold)\n", page && room > 0 ? "PASS" : "FAIL", (int)room);
+        shot("01b_home_scrolled");
+        if (page) lv_obj_scroll_to_y(page, 0, LV_ANIM_OFF);
+    }
     ui::open(ui::ScreenId::NowPlaying);
     shot("02_now_playing");
     ui::open(ui::ScreenId::Search);

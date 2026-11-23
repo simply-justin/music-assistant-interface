@@ -74,7 +74,10 @@ void build_all() {
     lv_obj_set_style_bg_color(s.base, theme::bg(), 0);
 
     for (auto& scr : s.screens) {
-        lv_obj_t* root = kit::column(s.base);
+        // Every page scrolls when its content is taller than the screen (screens with their own
+        // scroll area simply never overflow here). Settings opts out for its two panes.
+        lv_obj_t* root = kit::scroll_column(s.base);
+        lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLL_ELASTIC);  // spec: no overscroll, smaller redraws
         bool full = scr->full_screen();
         lv_obj_set_pos(root, full ? 0 : theme::kSideW, 0);
         lv_obj_set_size(root, full ? theme::kScreenW : theme::kScreenW - theme::kSideW,

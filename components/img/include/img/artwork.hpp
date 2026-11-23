@@ -16,7 +16,7 @@ namespace img {
 // The image proxy serves 80/160/256/512/1024 px (verified 2.10: other sizes → HTTP 400).
 int proxy_size(int display_px);
 
-// "http://host:port/imageproxy/<proxy_id>?size=N", or "" when the item has no proxy image.
+// "http://host:port/imageproxy/<proxy_id>?size=N&fmt=jpeg", or "" when the item has no proxy image.
 std::string proxy_url(const std::string& http_base, const core::Image& image, int display_px);
 
 struct Bitmap {
