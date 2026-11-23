@@ -8,6 +8,7 @@
   <img alt="ESP-IDF 5.5" src="https://img.shields.io/badge/ESP--IDF-5.5-E7352C">
   <img alt="LVGL 9.3" src="https://img.shields.io/badge/LVGL-9.3-343839">
   <img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C">
+  <a href="https://github.com/simply-justin/music-assistant-interface/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/simply-justin/music-assistant-interface/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Status: in development" src="https://img.shields.io/badge/status-in%20development-orange">
 </p>
@@ -84,7 +85,8 @@ The [Getting started](docs/getting-started.md) tutorial covers the prerequisites
 | Core: speakers, playback, queue, search, favourites, playlists, browse | Done |
 | Every screen and overlay, light and dark themes, English and Dutch | Done |
 | First-time setup flow (logic and screens) | Done |
-| PC simulator, host tests with ASan and UBSan, command-line test client | Done |
+| PC simulator, command-line test client | Done |
+| Unit, integration and end-to-end tests, CI on every push | Done |
 | Board support: display, touch, backlight, Wi-Fi via the ESP32-C6 | Planned |
 | On-device server discovery (mDNS) and the phone pairing page | Planned |
 | Hardware JPEG artwork decoding | Planned |

@@ -44,7 +44,7 @@ All knowledge of the server's schema lives in `components/backend/ma_commands.cp
 1. Check the command name and its arguments in your server's `/api-docs`.
 2. Add a builder that returns a `backend::Request`. Follow the existing builders in `ma::cmd`.
 3. If the command returns data, add a parser in `ma::parse` that converts the JSON into a `core::` model type.
-4. Add a host test for the parser in `test/host/tests.cpp`.
+4. Add a unit test for the parser in `test/host/unit_tests.cpp`.
 
 ## Add an action from the UI
 
@@ -105,7 +105,7 @@ A feature owns one area of state, such as the queue or the speakers.
 3. Register it in `components/app/features.cpp`. Order matters only if the feature depends on another one.
 4. Add the file to `components/app/CMakeLists.txt` and to `test/core.cmake`.
 5. If the UI needs the state, add a view to `updates.hpp` and publish it with `ctx_.publish(...)`.
-6. Add a host test that drives the feature with the mock backend.
+6. Add an integration test in `test/host/integration_tests.cpp` that drives the feature with the mock server.
 
 Rules for features:
 
@@ -128,6 +128,6 @@ Rules for features:
 
 2. Declare its factory in `components/ui/shell.hpp`, add a `ScreenId` in `ui/include/ui/ui.hpp` and register it in `ui::start()` in `shell.cpp`.
 3. Build it only from `kit::` components and `theme::` tokens. See [Design](design.md).
-4. Add a capture to the screenshot tour in `test/sim/main.cpp`, so the screen can be reviewed with `--shots`.
+4. Add a capture to the screenshot tour in `test/sim/main.cpp`, so the screen can be reviewed with `--shots`, and an end-to-end scenario in `test/sim/e2e.cpp` for its main interaction.
 
 LVGL must not delete the object whose event is running. When a click rebuilds its own container, wrap the work in `kit::later()`.

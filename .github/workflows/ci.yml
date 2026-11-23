@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "stage-*/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The PC builds only need cJSON from ESP-IDF; this is the version ESP-IDF 5.5 ships.
+  CJSON_VERSION: v1.7.18
+
+jobs:
+  host:
+    name: Unit and integration tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch cJSON
+        run: git clone --quiet --depth 1 --branch "$CJSON_VERSION" https://github.com/DaveGamble/cJSON.git "$RUNNER_TEMP/cjson"
+      - name: Configure
+        run: cmake -S test/host -B test/host/build -DCJSON_DIR="$RUNNER_TEMP/cjson"
+      - name: Build (with AddressSanitizer and UndefinedBehaviorSanitizer)
+        run: cmake --build test/host/build -j
+      - name: Unit tests
+        run: ctest --test-dir test/host/build -L unit --output-on-failure
+      - name: Integration tests
+        run: ctest --test-dir test/host/build -L integration --output-on-failure
+
+  e2e:
+    name: End-to-end tests (simulator)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install X11 headers
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libx11-dev
+      - name: Fetch cJSON
+        run: git clone --quiet --depth 1 --branch "$CJSON_VERSION" https://github.com/DaveGamble/cJSON.git "$RUNNER_TEMP/cjson"
+      - name: Cache LVGL
+        uses: actions/cache@v4
+        with:
+          path: test/sim/build/_deps
+          key: lvgl-v9.3.0-${{ runner.os }}
+      - name: Configure
+        run: cmake -S test/sim -B test/sim/build -DCJSON_DIR="$RUNNER_TEMP/cjson"
+      - name: Build
+        run: cmake --build test/sim/build -j
+      - name: End-to-end tests
+        run: ctest --test-dir test/sim/build -L e2e --output-on-failure
+      - name: Render every screen
+        if: always()
+        run: |
+          mkdir -p screenshots
+          test/sim/build/music_panel_sim --shots screenshots
+          python3 -c "
+          import glob, zlib, struct
+          def png(src, dst):
+              d = open(src, 'rb').read().split(b'\n', 3)
+              w, h = map(int, d[1].split()); px = d[3]
+              raw = b''.join(b'\0' + px[y*w*3:(y+1)*w*3] for y in range(h))
+              chunk = lambda t, b: struct.pack('>I', len(b)) + t + b + struct.pack('>I', zlib.crc32(t + b) & 0xffffffff)
+              open(dst, 'wb').write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
+          for f in glob.glob('screenshots/*.ppm'): png(f, f[:-4] + '.png')
+          "
+          rm -f screenshots/*.ppm
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+          retention-days: 14
+
+  firmware:
+    name: Firmware build (ESP32-P4)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with ESP-IDF 5.5.1
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.1
+          target: esp32p4

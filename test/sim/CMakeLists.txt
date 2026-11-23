@@ -4,6 +4,7 @@
 #   test/sim/build/music_panel_sim                 # mock data
 #   test/sim/build/music_panel_sim --live test/host/server.env
 #   test/sim/build/music_panel_sim --shots out/    # writes one PNG-ready .ppm per screen
+#   ctest --test-dir test/sim/build --output-on-failure   # end-to-end tests (panel_e2e)
 cmake_minimum_required(VERSION 3.16)
 project(panel_sim C CXX)
 set(CMAKE_CXX_STANDARD 17)
@@ -22,7 +23,18 @@ target_compile_options(panel_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra
 
 set(UI ${ROOT}/components/ui)
 file(GLOB UI_SOURCES ${UI}/*.cpp ${UI}/screens/*.cpp ${UI}/fonts/*.c)
-add_executable(music_panel_sim main.cpp art_loader.cpp ${CMAKE_CURRENT_LIST_DIR}/../host/ws_posix.cpp ${UI_SOURCES})
-target_include_directories(music_panel_sim PRIVATE ${UI}/include ${UI} ${CMAKE_CURRENT_LIST_DIR}/../host ${lvgl_SOURCE_DIR})
 find_package(Threads REQUIRED)
-target_link_libraries(music_panel_sim panel_core lvgl X11 m Threads::Threads)
+add_library(panel_ui STATIC ${UI_SOURCES})
+target_include_directories(panel_ui PUBLIC ${UI}/include ${UI} ${CMAKE_CURRENT_LIST_DIR}/../host ${lvgl_SOURCE_DIR})
+target_link_libraries(panel_ui PUBLIC panel_core lvgl X11 m Threads::Threads)
+
+add_executable(music_panel_sim main.cpp art_loader.cpp ${CMAKE_CURRENT_LIST_DIR}/../host/ws_posix.cpp)
+target_link_libraries(music_panel_sim panel_ui)
+
+# End-to-end: the real UI + core on the mock server, headless, driven by simulated touch.
+enable_testing()
+add_executable(panel_e2e e2e.cpp)
+target_link_libraries(panel_e2e panel_ui)
+add_test(NAME e2e COMMAND panel_e2e)
+add_test(NAME e2e_setup COMMAND panel_e2e --setup)
+set_tests_properties(e2e e2e_setup PROPERTIES LABELS e2e TIMEOUT 180)

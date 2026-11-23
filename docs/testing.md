@@ -8,7 +8,8 @@ If you have not built anything yet, start with [Getting started](getting-started
 
 | What it proves | Command |
 |---|---|
-| Logic: dedupe, search, protocol, features, setup, settings | `test/host/build/host_tests` |
+| Unit and integration tests | `ctest --test-dir test/host/build --output-on-failure` |
+| End-to-end tests | `ctest --test-dir test/sim/build --output-on-failure` |
 | The panel with mock data; safe to tap anything | `test/sim/build/music_panel_sim` |
 | The panel against your server; taps are real | `test/sim/build/music_panel_sim --live test/host/server.env` |
 | First-time setup from the start | `test/sim/build/music_panel_sim --setup [--live test/host/server.env]` |
@@ -18,9 +19,53 @@ If you have not built anything yet, start with [Getting started](getting-started
 
 All options are described in [Configuration](configuration.md).
 
-### Host tests
+## Automated tests
 
-`host_tests` builds the core, backend, app and i18n components for the PC with AddressSanitizer and UndefinedBehaviorSanitizer. It prints `all checks passed` and exits with 0, or prints each failed check with its file and line.
+Three levels, each with its own executable. Every test prints `ok` or `FAIL` with its name, failed checks show their file and line, and the process exits with 1 when anything failed.
+
+| Level | Executable | Covers | Runs in |
+|---|---|---|---|
+| Unit | `test/host/build/unit_tests` | Pure functions and single classes: dedupe, title parsing, search session, protocol session, JSON parsing, artwork URLs and scaling, backoff, display text, translations | Milliseconds |
+| Integration | `test/host/build/integration_tests` | The whole core, every feature, against the mock server and fake platform: connecting, speaker choice, search, queue, playlists, grouping, setup, settings, reconnecting | Under a second |
+| End-to-end | `test/sim/build/panel_e2e` | The real UI and core, headless, operated by simulated touch: navigation, scrolling, the speaker picker, search by typing, playing a favourite, switching language, and the full first-time setup | About 30 seconds |
+
+The unit and integration tests are built with AddressSanitizer and UndefinedBehaviorSanitizer, so memory errors and undefined behaviour fail them.
+
+### Writing a test
+
+Tests use the small harness in `test/host/check.hpp`:
+
+```cpp
+TEST(selected_speaker_is_remembered) {
+    Panel p;                                   // integration: App on the mock server
+    p.send(app::cmd::SelectPlayer{"kitchen"});
+    CHECK(p.settings.get("player") == "kitchen");
+}
+```
+
+End-to-end scenarios find things by their visible text and act through LVGL's input device, so they test what a person sees and touches:
+
+```cpp
+TEST(speaker_button_switches_the_speaker) {
+    CHECK(tap(ui::icon::speaker));
+    CHECK(tap("Kitchen"));
+    CHECK(g_panel->settings.get("player") == "kitchen");
+}
+```
+
+Scenarios named `setup_*` start from a panel that was never set up; `panel_e2e --setup` runs them, because the UI starts only once per process.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+| Job | Does |
+|---|---|
+| Unit and integration tests | Builds with sanitizers and runs both levels |
+| End-to-end tests | Builds the simulator, runs the scenarios, and uploads a screenshot of every screen as a build artifact |
+| Firmware build | Builds the firmware for the ESP32-P4 with ESP-IDF 5.5.1 |
+
+The PC builds do not need ESP-IDF in CI: they take cJSON straight from its repository (`-DCJSON_DIR=<path>`).
 
 ### Screenshots
 

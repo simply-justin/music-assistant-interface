@@ -32,8 +32,8 @@ components/
   ui/                 LVGL 9 UI: theme (tokens), kit (components), shell (sidebar, player bar,
                       navigation, overlays), screens/ (one file per screen), fonts/ (generated)
 test/
-  host/               PC build of core, backend, app and i18n; host_tests and panel_cli
-  sim/                The simulator: the real UI and core in an X11 window, or headless
+  host/               PC build of core, backend, app and i18n: unit and integration tests, panel_cli
+  sim/                The simulator (an X11 window, or headless) and the end-to-end tests
 ```
 
 Dependencies only point down:

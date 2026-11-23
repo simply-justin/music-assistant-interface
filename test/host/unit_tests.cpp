@@ -1,30 +1,18 @@
-// Host tests for the portable layers. Tiny on purpose: CHECK + one function per area.
-#include <cstdio>
+// Unit tests: pure functions and single classes, no App, no timing.
 #include <string>
 #include <vector>
 
-#include "app/app.hpp"
 #include "backend/backoff.hpp"
 #include "backend/ma_commands.hpp"
 #include "backend/ma_session.hpp"
-#include "backend/mock_backend.hpp"
+#include "check.hpp"
 #include "core/dedupe.hpp"
 #include "core/repeat_guard.hpp"
 #include "core/search.hpp"
 #include "core/text.hpp"
-#include "img/artwork.hpp"
 #include "i18n/i18n.hpp"
-#include "fake_platform.hpp"
+#include "img/artwork.hpp"
 #include "text.hpp"
-
-static int g_failed = 0;
-#define CHECK(cond)                                                    \
-    do {                                                               \
-        if (!(cond)) {                                                 \
-            std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); \
-            ++g_failed;                                                \
-        }                                                              \
-    } while (0)
 
 using namespace core;
 
@@ -53,7 +41,7 @@ static MediaItem named(MediaType type, std::string provider, std::string id, std
     return m;
 }
 
-static void test_text() {
+TEST(test_text) {
     auto t = split_title("Song (2011 Remaster) [feat. Someone]");
     CHECK(t.base == "song");
     CHECK((t.markers == std::vector<std::string>{"2011", "remaster"}));
@@ -65,7 +53,7 @@ static void test_text() {
     CHECK(normalize("  Hello,   WORLD! ") == "hello world");
 }
 
-static void test_dedupe() {
+TEST(test_dedupe) {
     // ISRC equal merges across providers; different ISRC never does.
     CHECK(same_item(track("spotify", "1", "A", "X", 200, "I1"), track("ytmusic", "2", "A", "X", 200, "I1")));
     CHECK(!same_item(track("spotify", "1", "A", "X", 200, "I1"), track("ytmusic", "2", "A", "X", 200, "I2")));
@@ -107,7 +95,7 @@ static void test_dedupe() {
     CHECK(ambiguous.size() == 3);
 }
 
-static void test_search_session() {
+TEST(test_search_session) {
     SearchSession s;
     s.set_query("cold", 0);
     CHECK(s.poll(100).requests.empty());  // debounced
@@ -154,7 +142,7 @@ static void test_search_session() {
     (void)b2;
 }
 
-static void test_ma_session() {
+TEST(test_ma_session) {
     std::vector<std::string> sent;
     ma::Session s([&](const std::string& t) { sent.push_back(t); return true; }, "secret");
     std::vector<backend::Connection> states;
@@ -218,7 +206,7 @@ static void test_ma_session() {
     CHECK(old.connection() == backend::Connection::IncompatibleServer);
 }
 
-static void test_parse() {
+TEST(test_parse) {
     backend::Json j(cJSON_Parse(R"({"media_type":"track","item_id":5,"provider":"library","name":"Yellow","uri":"library://track/5",
       "duration":269,"favorite":true,"external_ids":[["isrc","GBAYE0000267"]],
       "artists":[{"item_id":"1","provider":"library","name":"Coldplay","uri":"library://artist/1"}],
@@ -247,7 +235,7 @@ static void test_parse() {
     CHECK(cJSON_GetArrayItem(cJSON_GetObjectItem(rm.args.get(), "positions_to_remove"), 0)->valueint == 1);
 }
 
-static void test_i18n() {
+TEST(test_i18n) {
     i18n::Lang nl;
     CHECK(i18n::language_from_code("nl", nl));
     i18n::set_language(nl);
@@ -256,128 +244,7 @@ static void test_i18n() {
     CHECK(i18n::tr(i18n::Str::toast_added_to_queue, "Yellow") == "Added Yellow to the queue");
 }
 
-static void test_app_with_mock() {
-    backend::MockBackend mock;
-    app::MemorySettings settings;
-    settings.set("player", "kitchen");
-    std::vector<app::Update> updates;
-    FakePlatform platform;
-    app::App a(mock, settings, platform, [&](app::Update u) { updates.push_back(std::move(u)); });
-    a.start();
-    uint32_t now = 0;
-    auto run_until = [&](uint32_t t) {
-        for (; now <= t; now += 10) {
-            platform.tick(now);
-            a.tick(now);
-        }
-    };
-    run_until(200);
-
-    // Connected, saved player restored.
-    std::shared_ptr<const app::PlayersView> players;
-    for (auto& u : updates)
-        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
-    CHECK(players && players->players.size() == 2 && players->selected_id == "kitchen");
-
-    // Unified search: library first, then full; duplicates merged; live version kept apart.
-    a.handle(app::cmd::Search{"viva"});
-    run_until(1000);
-    std::shared_ptr<const SearchView> view;
-    for (auto& u : updates)
-        if (auto* v = std::get_if<std::shared_ptr<const SearchView>>(&u)) view = *v;
-    CHECK(view && view->status == SearchStatus::Done);
-    CHECK(view && view->result.tracks.size() == 2);
-    CHECK(view && view->result.tracks[0].provider == "library");
-    CHECK(view && view->result.tracks[0].alternatives.size() == 2);
-
-    // Add to queue, then again: "already in the queue" with an "Add again" action.
-    MediaItem viva = view->result.tracks[0];
-    a.handle(app::cmd::AddToQueue{viva});
-    run_until(1200);
-    updates.clear();
-    a.handle(app::cmd::AddToQueue{viva});  // within 1.5 s: ignored as a double tap
-    CHECK(updates.empty());
-    run_until(3000);
-    a.handle(app::cmd::AddToQueue{viva});
-    const app::Toast* toast = nullptr;
-    for (auto& u : updates)
-        if (auto* t = std::get_if<app::Toast>(&u)) toast = t;
-    CHECK(toast && toast->action && toast->text == "Viva La Vida is already in the queue");
-
-    // Clear up next: the current song (index 0 in the mock) stays, the rest goes.
-    a.handle(app::cmd::ClearUpNext{});
-    run_until(3100);
-    {
-        std::shared_ptr<const core::QueueState> cq;
-        for (auto& u : updates)
-            if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) cq = *x;
-        CHECK(cq && cq->items.size() == 1 && cq->items[0].name == "Viva La Vida");
-    }
-
-    // Undo: adding a new song offers Undo, which removes exactly that queue item.
-    core::MediaItem fresh;
-    fresh.type = core::MediaType::Track;
-    fresh.name = "Let It Happen";
-    fresh.uri = "library://track/t5";
-    updates.clear();
-    a.handle(app::cmd::AddToQueue{fresh});
-    run_until(3250);
-    const app::Toast* undo = nullptr;
-    for (auto& u : updates)
-        if (auto* t = std::get_if<app::Toast>(&u)) undo = t;
-    CHECK(undo && undo->action_label == "Undo" && std::holds_alternative<app::cmd::RemoveFromQueue>(*undo->action));
-    std::shared_ptr<const core::QueueState> q;
-    for (auto& u : updates)
-        if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
-    size_t before = q ? q->items.size() : 0;
-    if (undo) a.handle(*undo->action);
-    run_until(3400);
-    for (auto& u : updates)
-        if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
-    CHECK(q && q->items.size() + 1 == before);
-
-    // Grouping: Kitchen joins Living Room, then the group is dissolved.
-    a.handle(app::cmd::SetGroup{"living", {"kitchen"}});
-    run_until(3480);
-    for (auto& u : updates)
-        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
-    CHECK(players && players->players[0].group_members.size() == 2 && players->players[1].synced_to == "living");
-    a.handle(app::cmd::Ungroup{"living"});
-    run_until(3560);
-    for (auto& u : updates)
-        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
-    CHECK(players && players->players[0].group_members.empty() && players->players[1].synced_to.empty());
-
-    // Volume is clamped and reflected.
-    a.handle(app::cmd::SetVolume{"living", 140});
-    run_until(3640);
-    for (auto& u : updates)
-        if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
-    CHECK(players && players->players[0].volume_level == 100);
-
-    // Playlists: list (editable flag parsed), add a song, create one.
-    a.handle(app::cmd::LoadPlaylists{});
-    run_until(3800);
-    std::shared_ptr<const app::PlaylistsView> pls;
-    for (auto& u : updates)
-        if (auto* p = std::get_if<std::shared_ptr<const app::PlaylistsView>>(&u)) pls = *p;
-    CHECK(pls && pls->playlists.size() == 2 && pls->playlists[0].editable && !pls->playlists[1].editable);
-    if (!pls || pls->playlists.empty()) return;
-    updates.clear();
-    a.handle(app::cmd::AddToPlaylist{pls->playlists[0], viva});
-    a.handle(app::cmd::CreatePlaylist{"Kitchen songs", viva});
-    run_until(4200);
-    std::vector<std::string> toasts;
-    for (auto& u : updates)
-        if (auto* t = std::get_if<app::Toast>(&u)) toasts.push_back(t->text);
-    CHECK(toasts.size() == 2 && toasts[0] == "Added to Friday Night Mix" && toasts[1] == "Playlist Kitchen songs created");
-
-    a.handle(app::cmd::SetLanguage{i18n::Lang::nl});
-    CHECK(settings.get("lang") == "nl");
-    i18n::set_language(i18n::Lang::en);
-}
-
-static void test_display_text() {
+TEST(test_display_text) {
     CHECK(ui::clean("Daydreams💭😌") == "Daydreams");
     CHECK(ui::clean("My Childhood Mixtape👦🏽💽") == "My Childhood Mixtape");
     CHECK(ui::clean("A 🍻 Night") == "A Night");
@@ -385,79 +252,7 @@ static void test_display_text() {
     CHECK(ui::duration(242) == "4:02" && ui::duration(3723) == "1:02:03" && ui::duration(0) == "0:00");
 }
 
-static void test_setup_flow() {
-    backend::MockBackend mock;
-    mock.set_unconfigured();
-    app::MemorySettings settings;
-    FakePlatform platform;
-    platform.token = "";  // no phone: the user types the token
-    std::shared_ptr<const app::SetupView> view;
-    app::App a(mock, settings, platform, [&](app::Update u) {
-        if (auto* v = std::get_if<std::shared_ptr<const app::SetupView>>(&u)) view = *v;
-    });
-    a.start();
-    uint32_t now = 0;
-    auto run = [&](uint32_t ms) {
-        for (uint32_t end = now + ms; now <= end; now += 10) {
-            platform.tick(now);
-            a.tick(now);
-        }
-    };
-    CHECK(view && view->step == app::SetupStep::Welcome);
-    a.handle(app::cmd::SetupGo{app::SetupStep::Wifi});
-    run(1000);
-    CHECK(view->networks.size() == 4);
-    a.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "wrong"});
-    run(1000);
-    CHECK(view->wifi_error && *view->wifi_error == app::WifiResult::WrongPassword && view->step == app::SetupStep::Wifi);
-    a.handle(app::cmd::SetupJoinWifi{"HomeNetwork", "music"});
-    run(2600);
-    CHECK(view->step == app::SetupStep::Server && view->servers.size() == 1);
-    a.handle(app::cmd::SetupUseServer{"bad-host"});
-    run(8200);
-    CHECK(view->server_error && view->step == app::SetupStep::Server);
-    a.handle(app::cmd::SetupUseServer{"192.168.2.80"});
-    run(200);
-    CHECK(view->step == app::SetupStep::SignIn && !view->pairing_url.empty());
-    CHECK(settings.get("server_url") == "ws://192.168.2.80:8095/ws");
-    a.handle(app::cmd::SetupToken{"bad"});
-    run(200);
-    CHECK(view->token_error && view->step == app::SetupStep::SignIn);
-    a.handle(app::cmd::SetupToken{"good-token"});
-    run(200);
-    CHECK(view->step == app::SetupStep::Speaker && settings.get("token") == "good-token");
-    a.handle(app::cmd::SetupFinish{});
-    CHECK(view->step == app::SetupStep::Finished && settings.get("setup_done") == "1");
-}
-
-static void test_panel_brightness() {
-    backend::MockBackend mock;
-    app::MemorySettings settings;
-    FakePlatform platform;
-    app::App a(mock, settings, platform, [](app::Update) {});
-    a.start();
-    app::DisplaySettings d;
-    d.night = false;
-    d.brightness = 70;
-    a.handle(app::cmd::SetDisplay{d});
-    CHECK(platform.brightness == 70 && settings.get("brightness") == "70");
-    a.handle(app::cmd::SetDimmed{true});
-    CHECK(platform.brightness == 8);
-    d.night = true;
-    d.night_from = 0;
-    d.night_to = 24 * 60;  // always night
-    d.night_brightness = 5;
-    a.handle(app::cmd::SetDimmed{false});
-    a.handle(app::cmd::SetDisplay{d});
-    CHECK(platform.brightness == 5);
-    app::Appearance look{app::ThemeMode::Light, 3, app::Roundness::Round};
-    a.handle(app::cmd::SetAppearance{look});
-    CHECK(settings.get("theme") == "light" && settings.get("accent") == "3" && settings.get("round") == "2");
-    a.handle(app::cmd::ResetPanel{});
-    CHECK(platform.restarted && settings.get("brightness").empty());
-}
-
-static void test_artwork() {
+TEST(test_artwork) {
     CHECK(img::proxy_size(52) == 80 && img::proxy_size(160) == 160 && img::proxy_size(224) == 256 && img::proxy_size(520) == 512 && img::proxy_size(600) == 1024);
     core::Image im{"p", "spotify", "abc", true};
     CHECK(img::proxy_url("http://h:8095", im, 52) == "http://h:8095/imageproxy/abc?size=80&fmt=jpeg");
@@ -484,7 +279,7 @@ static void test_artwork() {
     CHECK(cache.get("a") && !cache.get("b") && cache.get("c") && cache.get("d"));
 }
 
-static void test_backoff() {
+TEST(test_backoff) {
     backend::Backoff b;
     CHECK(b.next() == 1000 && b.next() == 2000 && b.next() == 4000);
     for (int i = 0; i < 10; ++i) b.next();
@@ -493,7 +288,7 @@ static void test_backoff() {
     CHECK(b.next() == 1000);
 }
 
-static void test_repeat_guard() {
+TEST(test_repeat_guard) {
     RepeatGuard g;
     CHECK(g.allow("a", 0));
     CHECK(!g.allow("a", 1000));
@@ -502,20 +297,13 @@ static void test_repeat_guard() {
     CHECK(g.allow("a", 2800));
 }
 
-int main() {
-    test_text();
-    test_dedupe();
-    test_search_session();
-    test_ma_session();
-    test_parse();
-    test_i18n();
-    test_app_with_mock();
-    test_repeat_guard();
-    test_display_text();
-    test_setup_flow();
-    test_panel_brightness();
-    test_artwork();
-    test_backoff();
-    std::printf(g_failed ? "%d check(s) FAILED\n" : "all checks passed\n", g_failed);
-    return g_failed ? 1 : 0;
+TEST(every_string_is_translated) {
+    for (int lang = 0; lang < i18n::kLangCount; ++lang)
+        for (int id = 0; id < i18n::kStrCount; ++id) {
+            const char* s = i18n::kStrings[lang][id];
+            if (!s || !*s) std::printf("  missing: language %s, string %d\n", i18n::kLangCodes[lang], id);
+            CHECK(s && *s);
+        }
 }
+
+int main() { return check::run_all("unit"); }

@@ -84,10 +84,11 @@ This starts the panel as it is out of the box. The Wi-Fi networks are fake, and 
 ```sh
 cmake -S test/host -B test/host/build
 cmake --build test/host/build -j
-test/host/build/host_tests
+ctest --test-dir test/host/build --output-on-failure   # unit and integration tests
+ctest --test-dir test/sim/build --output-on-failure    # end-to-end tests
 ```
 
-The run ends with `all checks passed`. The host tests are built with AddressSanitizer and UndefinedBehaviorSanitizer, so memory errors fail the run too.
+All tests should pass. The unit and integration tests are built with AddressSanitizer and UndefinedBehaviorSanitizer, so memory errors fail the run too. [Testing](testing.md#automated-tests) explains what each level covers.
 
 ## Next steps
 

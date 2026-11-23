@@ -32,8 +32,8 @@ Follow [Getting started](docs/getting-started.md) to build the simulator and the
 
 Before you open a pull request:
 
-1. `test/host/build/host_tests` prints `all checks passed`.
-2. New logic has a test in `test/host/tests.cpp`.
+1. `ctest --test-dir test/host/build` and `ctest --test-dir test/sim/build` pass.
+2. New logic has a test at the right level: a unit test for a function or class, an integration test for a feature, an end-to-end scenario for a user flow. See [Testing](docs/testing.md#automated-tests).
 3. The simulator builds and the change works there with mock data.
 4. For a UI change, `music_panel_sim --shots <dir>` renders the affected screens correctly in the dark and light themes and in Dutch.
 5. `idf.py build` succeeds for the ESP32-P4.
@@ -42,7 +42,7 @@ Commands that change playback play on real speakers. Test them in live mode only
 
 ## Pull requests
 
-- One topic per pull request.
+- One topic per pull request. CI must pass: it runs every test level and builds the firmware.
 - Describe what changed and why, and how you tested it.
 - Add before and after screenshots for visual changes.
 - Update the documentation when behaviour, configuration or the design changes.
