@@ -1,140 +1,138 @@
-# Firmware architecture
+# Architecture
 
-Goal: readable code where a new feature costs almost nothing. Rule: **every feature is a module that plugs into fixed seams.** These are commands in, server events, connection changes and views out. Adding one touches its own file plus one line in a registry.
+This document explains how the firmware is organised and why it is organised that way. For step-by-step instructions on adding code, see [Extending the panel](extending.md).
 
-Decisions (2026-11-22): C++17 without exceptions or RTTI. Screens are hand-written from a shared component kit. An OTA slot is reserved. English and Dutch, plus any language added as a CSV column.
+## Design goals
 
-## Layers (ESP-IDF components)
+- **A new feature costs almost nothing.** Every feature is a module that plugs into fixed seams: commands come in, server events and connection changes arrive, and views go out. Adding one touches its own file and one line in a registry.
+- **Everything except the drivers runs on a PC.** The same code runs in the firmware, the simulator and the host tests.
+- **The UI never waits.** Network work happens on another task; the UI only reads finished snapshots.
+
+The code is C++17 without exceptions or RTTI. Screens are written by hand from a shared component kit; there is no UI designer or generated layout.
+
+## Layers
+
+The project is a set of ESP-IDF components:
 
 ```
-main/                 FreeRTOS wiring: core task, the two queues, NVS settings, backend choice (menuconfig)
+main/                 FreeRTOS wiring: the core task, the two queues, NVS settings, backend choice
 components/
-  app/                The core: App + feature registry
-    include/app/      commands.hpp (UI → core), updates.hpp (core → UI), feature.hpp (the seam), settings.hpp
-    features/         players, playback, queue, search, favourites, preferences  (one file each)
-    features.cpp      the registry: one line per feature
-  core/               Pure domain logic, host-tested: model, dedupe, title parsing, search session, repeat guard
-  backend/            Backend interface + implementations
-    ma_session        MA WebSocket protocol without the socket (host-tested)
-    ma_commands       every MA command name / arg / field: the only file that knows MA's schema
-    ma_client         esp_websocket_client glue (device only)
-    mock_backend      simulated server: mixed providers, duplicates, latency
-  i18n/               strings.csv → generated enums/tables; tr()
-  ui/                 LVGL 9 UI: theme (tokens), kit (components), shell (rail, mini-player, routing,
-                      overlays layer), screens/ (one file each), fonts/ (generated Inter + icons)
-  img/, platform/     later: artwork cache (HW JPEG), BSP glue (display, touch, backlight, Wi-Fi)
-test/host/            PC build of core + backend + app + i18n, with ASan/UBSan
+  core/               Pure domain logic: model, dedupe, title parsing, search session, repeat guard
+  backend/            The Backend interface and its implementations
+    ma_session          Music Assistant WebSocket protocol, without the socket
+    ma_commands         Every Music Assistant command, argument and field name
+    ma_client           esp_websocket_client glue (device only)
+    mock_backend        A simulated server: mixed providers, duplicates, latency
+  app/                The core application: App, the feature registry and the Platform seam
+    include/app/        commands.hpp (UI → core), updates.hpp (core → UI), feature.hpp, platform.hpp
+    features/           One file per feature: browse, favourites, panel, playback, players,
+                        playlists, preferences, queue, search, setup
+  i18n/               strings.csv → generated string IDs and tables; i18n::tr()
+  img/                Artwork: proxy URLs, scaling with pre-rounded corners, LRU cache with pins
+  ui/                 LVGL 9 UI: theme (tokens), kit (components), shell (sidebar, player bar,
+                      navigation, overlays), screens/ (one file per screen), fonts/ (generated)
+test/
+  host/               PC build of core, backend, app and i18n; host_tests and panel_cli
+  sim/                The simulator: the real UI and core in an X11 window, or headless
 ```
 
-Dependencies only point down: `main → app → backend → core`, and `app → i18n`. The UI will depend on `app` (commands + updates) only, never on `backend`. `core` has no ESP-IDF or LVGL includes.
+Dependencies only point down:
+
+```
+main → ui → app → backend → core
+              └→ i18n
+```
+
+- `core` has no ESP-IDF or LVGL includes, so the host tests compile it unchanged.
+- `ma_commands` is the only file that knows Music Assistant's schema. When the server API changes, only this file changes.
+- The UI depends on `app` (commands and updates) only, never on `backend`.
 
 ## Threads and data flow
 
 ```
-UI task (LVGL) ──Command──► g_jobs queue ──► core task: App.handle → features → Backend.request
+UI task (LVGL) ──Command──► jobs queue ──► core task: App.handle → features → Backend.request
      ▲                                          │
-     └── lv_timer drains ◄── g_updates queue ◄──┘ publish(Update: immutable snapshot)
-websocket task ──text frame──► g_jobs (posted as a job) ──► ma::Session on the core task
+     └── lv_timer drains ◄── updates queue ◄────┘ publish(Update: immutable snapshot)
+
+WebSocket task ──text frame──► jobs queue ──► ma::Session on the core task
 ```
 
-- One task owns all state, so there are no locks in features.
-- Views go out as `shared_ptr<const …>` snapshots, so the UI reads them without locks.
-- Nothing on the UI side ever waits on the network.
+- **One task owns all state.** Features run only on the core task, so they need no locks.
+- **Views are immutable snapshots.** Updates are `shared_ptr<const …>`, so the UI reads them without locking and without copying.
+- **The UI never blocks on the network.** A tap becomes a command on a queue and returns immediately. The result arrives later as an update.
 
-## How to add things
+In the simulator and the host tests, everything runs on a single thread; the queues are plain vectors.
 
-| You want | You touch |
-|---|---|
-| A new button/action | a struct in `commands.hpp`, plus one `if (auto* c = std::get_if<…>)` in the feature that owns it |
-| A new feature | `features/<name>.cpp` (class + `make_<name>`), one line in `features.cpp`, one in `features.hpp` |
-| A new MA command | one builder in `ma_commands.cpp` (+ a parser if it returns data) |
-| A new language | one column in `components/i18n/strings.csv` |
-| A new UI string | one row in `strings.csv`, then `i18n::tr(i18n::Str::<id>)` |
+### Rendering updates
 
-## Testing without the device
+`ui::apply()` receives every update. To keep the panel smooth, it skips work the user would not see:
 
-| Level | What it proves | Command |
-|---|---|---|
-| Host tests | logic: dedupe, search, protocol, features (with ASan/UBSan) | `test/host/build/host_tests` |
-| PC test app, mock | the whole core without any server | `test/host/build/panel_cli --mock` |
-| PC test app, live | the **same core code** against your real Music Assistant server | `test/host/build/panel_cli test/host/server.env` |
-| Device build | it compiles for the ESP32-P4 | `idf.py build` |
-| **Simulator** | the real screens in a 1280×800 window (X11/WSLg), mock or live | `test/sim/build/music_panel_sim [--live test/host/server.env]` |
-| Setup flow | first-time setup from the start (fake Wi-Fi password: `music`) | `music_panel_sim --setup [--live test/host/server.env]` |
-| Screenshots | every screen rendered headless to `.ppm` (review without a display) | `music_panel_sim --shots <dir>` |
+- It drops an update whose visible content equals the previous one. This matters because Music Assistant sends `player_updated` and `queue_time_updated` events several times a second.
+- When only the playback position changed, it redraws just the progress bar and the elapsed time.
+- When it rebuilds a screen, the screen keeps its scroll position.
+- Artwork fades in only when it arrives from the network, not when it comes from the cache.
 
-`test/host/server.env` (git-ignored, yours only):
+## The feature seam
 
-```
-MA_URL=ws://192.168.2.80:8095/ws
-MA_TOKEN=<long-lived token from Music Assistant › Settings › Profile>
+A feature implements `app::Feature`:
+
+```cpp
+class Feature {
+public:
+    virtual void on_connected() {}                      // after (re)connect: full re-sync
+    virtual void on_connection(backend::Connection) {}  // every connection state change
+    virtual void on_command(const Command&) {}          // from the UI or another feature
+    virtual void on_event(const backend::Event&) {}     // from the server
+    virtual void tick() {}                              // every core loop
+};
 ```
 
-Build everything on the PC:
+Through its `Context`, a feature can send requests to the server, publish updates to the UI, dispatch commands to other features and read settings. `components/app/features.cpp` creates the features in order; the order matters where one feature depends on another (for example, `players` selects the speaker the others use).
 
-```sh
-export IDF_PATH=~/esp/v5.5.1/esp-idf          # only for cJSON (remembered after the first configure)
-cmake -S test/host -B test/host/build && cmake --build test/host/build -j
-cmake -S test/sim  -B test/sim/build  && cmake --build test/sim/build  -j   # fetches LVGL 9.3 once
-```
+## The platform seam
 
-In the simulator the mouse is your finger; everything you tap sends the same commands the panel
-will. With `--live`, taps on Play/Add/Volume really play on your speakers.
+`app::Platform` (`components/app/include/app/platform.hpp`) holds everything that differs between the board and a PC: Wi-Fi scanning and joining, server discovery, the pairing page that receives a token from a phone, the backlight, system information, local time and restart.
 
-## Platform seam
+- The simulator and tests use `test/host/fake_platform.hpp`.
+- The firmware uses `BoardPlatform` in `main/main.cpp`. Until board support lands, it reports Wi-Fi, discovery and pairing as unavailable.
 
-`app::Platform` (`components/app/include/app/platform.hpp`) is everything that differs between
-the board and a PC: Wi-Fi scan/join, finding the server, the pairing page that receives the token
-from a phone, backlight, system info, local time, restart. The simulator and tests use
-`test/host/fake_platform.hpp`; `main/main.cpp` has `BoardPlatform`, which reports Wi-Fi/discovery/
-pairing as "not available" until the board package lands (Phase 2b).
+First-time setup (`features/setup.cpp`) and panel settings (`features/panel.cpp`) only talk to this interface, so they are fully tested on the PC.
 
-First-time setup (`features/setup.cpp`) and panel settings (`features/panel.cpp`) only talk to this
-interface, so they are fully tested on the PC (`test_setup_flow`, `test_panel_brightness`).
+## The UI
 
-## UI rules (how to add a screen)
+- A screen is a class in `components/ui/screens/` that implements `Screen`. The shell builds it once and refreshes it by topic when data changes.
+- Screens stay alive. Navigation shows and hides them instantly, without transitions.
+- Screens use only `kit::` components and `theme::` tokens, and every string comes from `strings.csv`. A change of theme or language rebuilds the screens.
+- Long lists (songs, queue, library tracks and radio) are windowed: only visible rows exist, about 15 objects for a 400-song playlist. Card grids are capped at 300 items.
+- `components/ui/tools/gen_assets.py` generates the fonts (Inter 4.1) and icons (Phosphor 2.1.1).
 
-- A screen is a class in `components/ui/screens/<name>.cpp` implementing `Screen` (build once,
-  `refresh(Topic)` on data changes, `on_open()` to request data), plus one line in `ui::start()`.
-- Screens use only `kit::` components and `theme::` tokens; every string comes from `strings.csv`.
-- Screens stay alive; navigation shows/hides them instantly (spec: no animated transitions).
-- A click that rebuilds its own container uses `kit::later()` (LVGL must not delete the object
-  whose event is running).
-- Fonts and icons are generated by `components/ui/tools/gen_assets.py` (Inter 4.1, Phosphor 2.1.1).
-- Emoji in names are removed for display (`ui::clean`); decision 2026-11-22.
+See [Design](design.md) for the visual system.
 
-Device (when it arrives):
+## The Music Assistant protocol
 
-```sh
-. $IDF_PATH/export.sh
-idf.py set-target esp32p4      # once
-idf.py menuconfig              # Music panel → Backend: Mock | Music Assistant (+ URL, token)
-idf.py build flash monitor
-```
+Verified against Music Assistant 2.10.13 (API schema 65):
 
-## Verified against the real server (2.10.13, schema 65, 2026-11-22)
+- **Transport.** `ws://<server>:8095/ws`. The server sends `server_info` first; the client must then send `auth` with its token (required since schema 28).
+- **Commands.** Every command and argument name in `ma_commands.cpp` matches the server's `/api-docs/commands.json`.
+- **Library-first search** uses `providers: ["library"]`, the documented replacement for `library_only`.
+- **Players** use `name`, `playback_state` and `group_members`. A player's queue comes from `player_queues/get_active_queue`; it is the player's own ID unless the player is grouped.
+- **Group volume** is `players/cmd/group_volume`.
+- **Clearing the queue.** `player_queues/clear` empties the whole queue and stops playback, even with `skip_stop: true`. To clear only the upcoming items, the panel deletes them one by one.
+- **Playlist positions** for `remove_playlist_tracks` count from 1.
+- **External IDs** are a list of `[type, value]` pairs. Images carry a `type` (the panel uses `thumb`) and a `proxy_id`.
 
-- Transport: `ws://<server>:8095/ws`, `server_info` first, then `auth {token}` is mandatory (schema ≥ 28)
-- Every command and argument name used by `ma_commands.cpp`, checked against `/api-docs/commands.json`
-- Library-first search uses `providers: ["library"]` (the documented replacement for `library_only`)
-- Corrected from the brief: players use `name`, `playback_state` and `group_members`; a player's queue comes from `player_queues/get_active_queue` (it is the player id unless grouped); `clear` gets `skip_stop: true`; group master volume is `players/cmd/group_volume`
-- `external_ids` is a list of `[type, value]` pairs, and images carry `type` (we use `thumb`) plus `proxy_id`
-- Security: the panel remembers the `server_id` and never sends its token to a different server at the same address (advice from `/api-docs`)
+### Security
 
-## Known limits
+- The panel stores the server's `server_id` and never sends its token to a different server at the same address.
+- During development the token lives in `test/host/server.env`, which Git ignores.
 
-- Not checked live yet: commands that change playback (play, add, clear, volume). That needs your OK, because they play on your speakers.
-- On the board, Wi-Fi join, server discovery (mDNS), the token pairing page and backlight PWM are
-  stubs until Phase 2b; set the server/token in menuconfig meanwhile.
-- The playback-error banner shows when Music Assistant marks the current queue item unavailable;
-  a richer error signal is open question 2.
-- Verified live on 2.10.13 (2026-11-22): `player_queues/clear` empties the queue and stops the
-  player even with `skip_stop`, so "Clear up next" deletes the upcoming items; playlist positions
-  for `remove_playlist_tracks` count from 1.
-- Wi-Fi (via the C6), PSRAM, flash size, partitions/OTA and chip revision come from Waveshare's examples once the board is here.
-- Long lists (songs, queue, library tracks/radio) are windowed: only visible rows exist (15 objects
-  for a 400-song playlist). Card grids are still capped at 300.
-- Artwork: `img/` (proxy URL, scaling with pre-rounded corners, LRU cache with pins) is portable; the
-  PC loader fetches + decodes with TJpgDec. The board loader (esp_http_client + hardware JPEG) is
-  Phase 2b.
-- No accent folding in dedupe ("Beyoncé" ≠ "Beyonce"), marked shortcut.
+## Connection handling
+
+When the connection drops, the panel shows "Can't reach Music Assistant" with a Retry button and reconnects on its own with exponential backoff: 1, 2, 4… up to 30 seconds between attempts. After reconnecting, every feature re-syncs in `on_connected()`.
+
+## Known limitations
+
+- **Board support is not implemented.** Wi-Fi join, mDNS discovery, the token pairing page, backlight PWM and the hardware JPEG decoder are stubs on the device. Set the server and token in menuconfig until then.
+- **Playback errors** appear only when Music Assistant marks the current queue item as unavailable. A richer error signal is an open question.
+- **Dedupe does not fold accents**: it treats "Beyoncé" and "Beyonce" as different names.
+- Wi-Fi via the ESP32-C6, PSRAM, flash size, the partition layout and the chip revision will follow Waveshare's reference examples.

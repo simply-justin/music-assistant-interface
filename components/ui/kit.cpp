@@ -19,7 +19,7 @@ void remove_style(lv_obj_t* o) {
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
 }
 
-// Pressed = +12 % white over a dark control, −10 % on a light one (spec §1).
+// Pressed = +12 % white over a dark control, −10 % on a light one (docs/design.md, Motion).
 void pressable(lv_obj_t* o, lv_color_t base, bool light = false) {
     bool darken = light || theme::light();
     lv_obj_set_style_bg_color(o, base, 0);
@@ -677,7 +677,7 @@ lv_obj_t* sheet(int32_t width, Action on_close) {
     lv_obj_set_style_border_color(panel, theme::hairline(), 0);
     lv_obj_add_flag(panel, LV_OBJ_FLAG_CLICKABLE);  // swallow taps so they don't reach the scrim
     lv_obj_center(panel);
-    // Motion: panel rises 16 px over 150 ms (spec §1). Only translate: no opacity on containers.
+    // Motion: panel rises 16 px over 150 ms (docs/design.md, Motion). Only translate: no opacity on containers.
     lv_anim_t a;
     lv_anim_init(&a);
     lv_anim_set_var(&a, panel);

@@ -1,5 +1,5 @@
 #pragma once
-// Design tokens (docs/design-spec.md §1, visual direction A). Colours and radii come from the
+// Design tokens (docs/design.md). Colours and radii come from the
 // active Appearance (dark/light, accent, roundness) and can change at run time; screens are
 // rebuilt when they do. Screens use these names, never raw values.
 #include "../fonts/assets.hpp"

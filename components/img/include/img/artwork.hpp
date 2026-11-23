@@ -27,7 +27,7 @@ struct Bitmap {
 };
 
 // Now Playing background from an artwork colour: HSL lightness ≤ 16 %, saturation ≤ 45 %, so
-// text stays readable on any artwork (spec §1). 0xRRGGBB in and out.
+// text stays readable on any artwork (docs/design.md, Artwork colour). 0xRRGGBB in and out.
 uint32_t art_background(uint32_t rgb);
 // Light-theme counterpart: a pale tint (lightness ≥ 90 %, saturation ≤ 35 %) for dark text.
 uint32_t art_background_light(uint32_t rgb);

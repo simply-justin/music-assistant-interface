@@ -1,106 +1,119 @@
-# How to test (without the panel)
+# Testing
 
-Everything below runs on your PC under WSL. The simulator is the real panel software (same core,
-same screens) in a 1280×800 window; only the board-specific parts (display driver, Wi-Fi chip,
-backlight) are replaced by stand-ins.
+Every part of the panel except the board drivers can be tested on a PC. The simulator runs the same core and the same screens as the firmware; only the display driver, Wi-Fi chip and backlight are replaced by stand-ins.
 
-## 1. Build once
+If you have not built anything yet, start with [Getting started](getting-started.md).
 
-```sh
-cd ~/projects/open-collective/music-assistant-interface
-export IDF_PATH=~/esp/v5.5.1/esp-idf                      # only needed for the first configure
-cmake -S test/sim  -B test/sim/build  && cmake --build test/sim/build  -j
-cmake -S test/host -B test/host/build && cmake --build test/host/build -j
-```
+## Ways to test
 
-After pulling new code, only the `cmake --build …` lines are needed.
-
-Your server and token live in `test/host/server.env` (never committed):
-
-```
-MA_URL=ws://192.168.2.80:8095/ws
-MA_TOKEN=<long-lived token>
-```
-
-## 2. Pick a way to test
-
-| Command | What you get |
+| What it proves | Command |
 |---|---|
-| `test/sim/build/music_panel_sim` | The panel with **fake data**. Nothing reaches your server; safe to tap anything. |
-| `test/sim/build/music_panel_sim --live test/host/server.env` | The panel on **your server**. Play/queue/volume/playlist taps are real — they play on your speakers. |
-| `test/sim/build/music_panel_sim --setup` | First-time **setup** from the start (fake Wi-Fi password: `music`). Add `--live test/host/server.env` to finish it against your server. |
-| `test/host/build/panel_cli test/host/server.env` | Typed commands instead of screens (type `help`). Handy to try one thing quickly. |
-| `test/host/build/host_tests` | All automatic checks; prints `all checks passed`. |
-| `music_panel_sim --shots <folder>` | Renders every screen to image files (`.ppm`) without a window. |
+| Logic: dedupe, search, protocol, features, setup, settings | `test/host/build/host_tests` |
+| The panel with mock data; safe to tap anything | `test/sim/build/music_panel_sim` |
+| The panel against your server; taps are real | `test/sim/build/music_panel_sim --live test/host/server.env` |
+| First-time setup from the start | `test/sim/build/music_panel_sim --setup [--live test/host/server.env]` |
+| Every screen rendered to images, without a window | `test/sim/build/music_panel_sim --shots <dir>` |
+| The core without a UI, driven by typed commands | `test/host/build/panel_cli test/host/server.env` (or `--mock`) |
+| The firmware compiles for the ESP32-P4 | `idf.py build` |
 
-The mouse is your finger: click = tap, hold ~0.5 s = long-press, drag = scroll.
-Close the window to quit.
+All options are described in [Configuration](configuration.md).
 
-**Before tapping Play in `--live` mode:** pick the speaker (speaker button in the bottom bar, right) and
-turn the volume down (slider next to it) — the panel plays exactly where and as loud as you tell it.
+### Host tests
 
-## 3. What to try (and what should happen)
+`host_tests` builds the core, backend, app and i18n components for the PC with AddressSanitizer and UndefinedBehaviorSanitizer. It prints `all checks passed` and exits with 0, or prints each failed check with its file and line.
 
-**Home**
-- Favourites grid (6 tiles): tap → plays. Hold → preview with Play / Play next / Add to queue / Remove.
-- "Recently played / Your playlists" switch below. "See all" → Library.
-- Speaker button in the bottom bar → speaker list; pick one → it becomes the speaker for everything.
-  "Play on more speakers" under the list groups speakers (only those Music Assistant can group).
+### Screenshots
 
-**Search** (rail → Search)
-- Type with the on-screen keyboard: your library answers first ("From your library, still
-  searching everywhere…"), then everything. One row per song; "+2 sources" when Spotify/YouTube/
-  library have the same recording. The grey letter is where it will play from.
-- Chips filter by type (never by service). "123" / "ABC" switch the keyboard.
-- "…" on a song → Play now / Play next / Add to queue / Add to playlist / favourite / Play from.
+`--shots <dir>` walks through every screen and overlay and writes one `.ppm` image per screen. It also runs two automatic checks and prints their results:
 
-**Now Playing** (tap the bottom bar or the Home card)
-- Big artwork, background colour follows the artwork. Seek, shuffle, repeat, volume, heart.
-- Radio: no seek / skip / shuffle (a LIVE tag and a stop button instead).
+- **Windowed list:** opens a 400-song playlist, scrolls to the end, and reports how many row objects exist (about 15).
+- **Speaker row tap test:** checks that the name, the status line and empty space in a speaker row all hit the same row. It prints `PASS` or `FAIL`.
 
-**Queue**
-- Tap a song → plays it. × removes. Hold → Play next / Move up / Move down.
-- Add the same song twice → "is already in the queue" with **Add again**.
-- After adding a song the toast offers **Undo**.
-- "Clear" → asks first → removes everything *after* the current song; the music keeps playing.
+With `--setup`, it captures each setup step instead, including the error states.
 
-**Library** — tabs Favourites / Playlists / Albums / Artists / Tracks / Radio.
-Open a playlist → Play / Shuffle / heart; **Edit** (only for playlists you can change) → × removes
-a song, "Delete playlist" asks first.
+### Command-line client
 
-**Settings** — categories on the left, the page on the right.
-- Screen & night mode: brightness, dim after, night schedule, "Preview dimmed screen".
-- Leave the window alone for the "dim after" time → clock screen; click → wakes.
-- Music Assistant: server, version, your services and whether they work, preferred-service order.
-- Language: English ↔ Nederlands, instantly.
-- About & diagnostics: frame-rate counter and touch dots (try them).
+`panel_cli` runs the same core as the panel without any screen, which makes it the quickest way to try one command against a real server. Type `help` for the list. The main commands are:
 
-**Setup** (`--setup`) — Wi-Fi list → wrong password shows the error → `music` works → server
-found (or type an address; a wrong one says "Nothing answered") → sign in (QR; the fake "phone"
-sends the token after 3 s) → choose speaker → done → Home.
+| Command | Does |
+|---|---|
+| `s <text>` | Search everywhere; results are numbered |
+| `play <n>`, `add <n>`, `next <n>` | Play result *n*, add it to the end of the queue, or play it next |
+| `pp`, `n`, `p` | Play/pause, next, previous |
+| `speakers`, `use <n>` | List speakers, select speaker *n* |
+| `vol <0-100>`, `gvol <0-100>` | Speaker volume, group volume |
+| `q`, `rm <n>`, `clear` | Show the queue, remove item *n*, clear upcoming items |
+| `pl`, `plsongs <p>` | List playlists, list a playlist's songs |
+| `lang en\|nl` | Switch language |
 
-**Offline** — in `--live`, switch off Music Assistant (or Wi-Fi) for a moment: Home shows "Can't
-reach Music Assistant" with Retry; it reconnects by itself (1 s, 2 s, 4 s … up to 30 s apart) and
-reloads.
+## Manual test checklist
 
-## 4. Telling me about problems
+Use the simulator with mock data unless a step says otherwise.
 
-Most useful: the screen, what you tapped, what you expected, what happened. A screenshot of the
-window is perfect. For timing/stutter issues, switch on the frame-rate counter first.
+### Home
 
-## 5. What the PC cannot tell us
+- [ ] Tapping a favourite tile plays it.
+- [ ] Holding a favourite tile opens a preview with Play, Play next, Add to queue and Remove.
+- [ ] **See all** opens the Library.
+- [ ] The speaker icon in the player bar opens the speaker list. Choosing a speaker makes it the target for everything.
+- [ ] **Play on more speakers**, below the list, groups speakers. It only offers speakers that Music Assistant can group.
 
-Real touch feel, scrolling smoothness, frame rate and memory on the ESP32-P4, the Wi-Fi chip,
-backlight, and how the hardware JPEG decoder performs. Those are measured when the panel arrives
-(Phase 2b and Phase 5).
+### Search
 
-## 6. When the panel arrives
+- [ ] While typing, library results appear first with "From your library, still searching everywhere…", then the full results.
+- [ ] A recording available from several sources shows once, with a "+2 sources" tag. The grey letter shows where it will play from.
+- [ ] Chips filter by media type, never by service.
+- [ ] **123** and **ABC** switch the keyboard layout.
+- [ ] The **…** menu on a song offers Play now, Play next, Add to queue, Add to playlist, Favourite and Play from.
 
-```sh
-. ~/esp/v5.5.1/esp-idf/export.sh
-idf.py menuconfig          # Music panel → Backend: Music Assistant, URL + token (until setup runs on the board)
-idf.py build flash monitor
-```
+### Now Playing
 
-The board package (display, touch, Wi-Fi via the C6, backlight, artwork decoder) is Phase 2b; until
-then the firmware runs the core and logs what it would show.
+- [ ] The background colour follows the artwork.
+- [ ] Seek, shuffle, repeat, volume and favourite all work.
+- [ ] For radio, seek, skip and shuffle are hidden; a LIVE tag and a stop button appear instead.
+
+### Queue
+
+- [ ] Tapping a song plays it; **×** removes it; holding offers Play next, Move up and Move down.
+- [ ] Adding a song that is already queued shows "is already in the queue" with **Add again**.
+- [ ] After adding a song, the toast offers **Undo**.
+- [ ] **Clear** asks for confirmation, then removes everything after the current song. The music keeps playing.
+
+### Library
+
+- [ ] The tabs are Favourites, Playlists, Albums, Artists, Tracks and Radio.
+- [ ] A playlist offers Play, Shuffle and Favourite.
+- [ ] **Edit** appears only on playlists you can change. In edit mode, **×** removes a song and **Delete playlist** asks for confirmation.
+
+### Settings
+
+- [ ] **Appearance:** theme, accent, corner style and Reduce motion apply immediately.
+- [ ] **Screen & night mode:** brightness, dim after, night schedule and **Preview dimmed screen** work. Leaving the window alone for the dim-after time shows the clock; a click wakes it.
+- [ ] **Music Assistant:** shows the server, its version, your services and their status, and the preferred-source order.
+- [ ] **Language:** English and Nederlands switch instantly.
+- [ ] **About & diagnostics:** the frame-rate counter and touch dots can be switched on.
+
+### Setup (`--setup`)
+
+- [ ] A wrong Wi-Fi password shows an error; `music` connects.
+- [ ] The server is found automatically. A wrong typed address shows "Nothing answered".
+- [ ] Sign-in shows a QR code; the simulated phone sends the token after about three seconds.
+- [ ] Choosing a speaker and finishing leads to Home.
+
+### Connection loss (`--live`)
+
+- [ ] Stop Music Assistant, or disconnect the network, for a moment. Home shows "Can't reach Music Assistant" with **Retry**.
+- [ ] The panel reconnects by itself, waiting 1, 2, 4… up to 30 seconds between attempts, and reloads its data.
+
+## Reporting a problem
+
+A useful report includes:
+
+1. The screen and what you tapped.
+2. What you expected and what happened instead.
+3. A screenshot of the simulator window.
+4. For stutter or timing problems, the frame rate: switch on the counter in **Settings › About & diagnostics** first.
+
+## What a PC cannot test
+
+Touch feel, scrolling smoothness, frame rate and memory use on the ESP32-P4, the Wi-Fi chip, the backlight and the hardware JPEG decoder. These are measured on the device once board support is in place.

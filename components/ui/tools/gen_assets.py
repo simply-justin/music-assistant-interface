@@ -15,7 +15,7 @@ SRC = pathlib.Path(sys.argv[1])
 OUT = pathlib.Path(__file__).resolve().parent.parent / "fonts"
 CONV = ["npx", "-y", "lv_font_conv@1.5.3", "--no-compress", "--format", "lvgl", "--lv-include", "lvgl.h"]
 
-# Basic Latin, Latin-1, Latin Extended-A + typographic punctuation (spec §1, Typography).
+# Basic Latin, Latin-1, Latin Extended-A + typographic punctuation (docs/design.md, Typography).
 TEXT_RANGE = "0x20-0x7E,0xA0-0x17F,0x2013,0x2014,0x2018,0x2019,0x201C,0x201D,0x2022,0x2026,0x2212"
 
 # name: (size, weight file, range)
