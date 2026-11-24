@@ -66,7 +66,7 @@ private:
         kit::overline(info, tr(type));
         kit::text(info, item.name, theme::h1(), theme::text(), true);
         if (track_count)
-            kit::text(info, songs(track_count) + " · " + duration(total), theme::body(), theme::text2());
+            kit::text(info, songs(track_count) + " · " + total_duration(total), theme::body(), theme::text2());
 
         lv_obj_t* right = kit::column(body, 16);
         lv_obj_set_flex_grow(right, 1);

@@ -250,6 +250,8 @@ TEST(test_display_text) {
     CHECK(ui::clean("A 🍻 Night") == "A Night");
     CHECK(ui::clean("Beyoncé – Déjà Vu") == "Beyoncé – Déjà Vu");  // accents and dashes stay
     CHECK(ui::duration(242) == "4:02" && ui::duration(3723) == "1:02:03" && ui::duration(0) == "0:00");
+    CHECK(ui::total_duration(242) == "4 min" && ui::total_duration(103380) == "28 hr 43 min");
+    CHECK(ui::total_duration(7200) == "2 hr" && ui::total_duration(3599) == "1 hr" && ui::total_duration(0) == "0 min");
 }
 
 TEST(test_artwork) {
@@ -304,6 +306,28 @@ TEST(every_string_is_translated) {
             if (!s || !*s) std::printf("  missing: language %s, string %d\n", i18n::kLangCodes[lang], id);
             CHECK(s && *s);
         }
+}
+
+TEST(normalize_folds_accents) {
+    CHECK(normalize("Beyoncé") == "beyonce");
+    CHECK(normalize("BEYONCÉ – Déjà Vu") == "beyonce deja vu");
+    CHECK(normalize("Sigur Rós") == "sigur ros");
+    CHECK(normalize("Straße") == "strasse");
+    CHECK(normalize("Motörhead") == "motorhead");
+    CHECK(normalize("Łódź") == "lodz");
+    CHECK(normalize("Œuvre") == "oeuvre");
+    CHECK(normalize("Don’t Stop… Me") == "don t stop me");  // curly quote and ellipsis separate like ' and ...
+    CHECK(normalize("A × B") == "a b");        // a symbol separates, it is not a letter
+    CHECK(normalize("Кино") == "Кино");        // other scripts unchanged
+    CHECK(normalize("\xC3") == "\xC3");        // a cut-off sequence is kept, not read past the end
+}
+
+TEST(dedupe_merges_accent_variants) {
+    CHECK(same_item(track("library", "1", "Déjà Vu", "Beyoncé", 240), track("spotify", "2", "Deja Vu", "Beyonce", 241)));
+    std::vector<MediaItem> shown;
+    merge_into(shown, {track("spotify", "2", "Deja Vu", "Beyonce", 241)}, {});
+    merge_into(shown, {track("library", "1", "Déjà Vu", "BEYONCÉ", 240)}, {});
+    CHECK(shown.size() == 1 && shown[0].provider == "library");
 }
 
 int main() { return check::run_all("unit"); }

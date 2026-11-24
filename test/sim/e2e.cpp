@@ -154,8 +154,29 @@ void press_at(lv_point_t p, uint32_t hold_ms) {
     g_panel->run(150);
 }
 
+// What a press at this label would hit, when that is something that acts on a tap (it has an
+// event handler): the label's row or button, not a screen-wide container behind a plain label.
+lv_obj_t* tap_target(lv_obj_t* label) {
+    lv_point_t p = center(label);
+    lv_obj_t* hit = lv_indev_search_obj(lv_layer_top(), &p);
+    if (!hit) hit = lv_indev_search_obj(lv_screen_active(), &p);
+    for (lv_obj_t* o = label; o; o = lv_obj_get_parent(o))
+        if (o == hit) return lv_obj_get_event_count(hit) > 0 ? hit : nullptr;
+    return nullptr;
+}
+
+// Taps the visible text that leads somewhere (the same words can also sit on a plain label).
 bool tap(const std::string& text) {
-    lv_obj_t* l = find_text(text);
+    lv_obj_t* first = nullptr;
+    lv_obj_t* actionable = nullptr;
+    auto match = [&](lv_obj_t* o) {
+        if (actionable || !lv_obj_check_type(o, &lv_label_class) || !on_screen(o) || text != lv_label_get_text(o)) return;
+        if (!first) first = o;
+        if (tap_target(o)) actionable = o;
+    };
+    walk(lv_layer_top(), match);
+    if (!actionable) walk(lv_screen_active(), match);
+    lv_obj_t* l = actionable ? actionable : first;
     if (!l) {
         std::printf("    (nothing on screen reads \"%s\")\n", text.c_str());
         return false;

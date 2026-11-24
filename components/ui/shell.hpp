@@ -78,6 +78,17 @@ void confirm(const std::string& title, const std::string& body, const std::strin
 // Shared bits used by several screens.
 std::string songs(size_t count);  // "1 song", "14 songs" / "1 nummer", "14 nummers"
 std::string clock_text(int minutes);  // 22:00
+// Grouped rows (Settings, setup): group() = optional title + card; line() = one row in it, with a
+// hairline above every row but the first. kRowPad is the card's inner left/right padding.
+constexpr int32_t kRowPad = 20;
+lv_obj_t* group(lv_obj_t* parent, const std::string& title);
+lv_obj_t* line(lv_obj_t* card, int32_t height = 64);  // 0 = as tall as its content
+lv_obj_t* grow_text(lv_obj_t* row, const std::string& s, const std::string& sub = {});
+void footnote(lv_obj_t* card, const std::string& s);  // grey text under a group
+void value_row(lv_obj_t* card, const std::string& label, const std::string& value, lv_color_t colour = theme::text2());
+void toggle_row(lv_obj_t* card, const std::string& label, const std::string& sub, bool on, std::function<void(bool)> changed);
+// The whole row is the button: text in the accent, or the warning colour for destructive actions.
+void action_row(lv_obj_t* card, const char* glyph, const std::string& label, kit::Action action, bool danger = false);
 // A card-like rounded block on `surface` (Settings, setup lists).
 lv_obj_t* card(lv_obj_t* parent, const std::string& title = {});
 // A tappable settings/list row: icon, title, optional subtitle, optional chevron.

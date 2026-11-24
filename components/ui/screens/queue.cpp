@@ -64,9 +64,9 @@ private:
         lv_obj_t* titles = kit::column(head, 2);
         lv_obj_set_flex_grow(titles, 1);
         kit::text(titles, tr(i18n::Str::queue_up_next), theme::h2(), theme::text());
-        if (count) kit::text(titles, songs(count) + " · " + duration(total), theme::meta(), theme::text2());
-        bool shuffle = q && q->shuffle;
-        kit::chip(head, icon::shuffle, tr(i18n::Str::queue_shuffle), shuffle, [shuffle] { send(app::cmd::SetShuffle{!shuffle}); });
+        lv_obj_set_style_pad_left(titles, 8, 0);  // in line with the row content below (media_row's padding)
+        if (count) kit::text(titles, songs(count) + " · " + total_duration(total), theme::meta(), theme::text2());
+        // Shuffle sits in the player bar below; only Clear belongs to this list.
         if (count) {
             kit::chip(head, icon::close, tr(i18n::Str::queue_clear), false, [count] {
                 std::string body = i18n::tr(i18n::Str::queue_clear_body, std::to_string(count));

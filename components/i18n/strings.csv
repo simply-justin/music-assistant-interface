@@ -201,7 +201,12 @@ about_fps_sub,Small FPS counter in the corner,Kleine FPS-teller in de hoek
 about_touches,Show touch points,Aanrakingen tonen
 about_touches_sub,Dot where each touch lands,Stip waar je aanraakt
 setup_title,Set up,Instellen
-setup_step,Step {} of 5,Stap {} van 5
+setup_step_speaker,Speaker,Speaker
+total_hours,{} hr,{} uur
+total_minutes,{} min,{} min
+setup_need_title,You'll need,Je hebt nodig
+setup_need_wifi,The password of your Wi-Fi network,Het wachtwoord van je wifi-netwerk
+setup_need_phone,A phone or computer signed in to Music Assistant,Een telefoon of computer die is aangemeld bij Music Assistant
 setup_back,Back,Terug
 setup_continue,Continue,Verder
 setup_welcome_title,Let's set up your music,Laten we je muziek instellen

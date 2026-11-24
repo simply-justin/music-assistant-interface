@@ -31,12 +31,10 @@ private:
 
         lv_obj_t* header = kit::row(root_, 12);
         lv_obj_set_size(header, lv_pct(100), 80);
-        lv_obj_set_style_pad_hor(header, 24, 0);
+        lv_obj_set_style_pad_hor(header, 44, 0);  // the 32 px glyphs line up with the cover and the list edge
         kit::icon_button(header, icon::chevron_down, [] { back(); }, 56, 32);
         kit::spacer(header);
-        lv_obj_t* spk = kit::chip(header, icon::speaker, p ? p->name : tr(i18n::Str::speaker_none), false, [] { open_speakers(); });
-        lv_obj_set_style_border_color(spk, theme::light() ? lv_color_hex(0x000000) : lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_style_border_opa(spk, LV_OPA_30, 0);
+        // Speaker, shuffle, repeat and volume live in the player bar below: no second copy up here.
         if (item) {
             auto it = *item;
             kit::icon_button(header, icon::more, [it] { open_track_menu(it); }, 56, 28);
@@ -72,9 +70,9 @@ private:
 
         // Left: cover + what it is. The background follows the real artwork once decoded.
         lv_obj_t* left = kit::column(body, 16);
-        lv_obj_set_width(left, 440);
+        lv_obj_set_width(left, kArt);
         lv_obj_t* root = root_;
-        kit::art(left, *item, 440, theme::r_art(), tint, [root](uint32_t avg) {
+        kit::art(left, *item, kArt, theme::r_art(), tint, [root](uint32_t avg) {
             lv_obj_set_style_bg_color(root, theme::art_tint(lv_color_hex(avg)), 0);
         });
         lv_obj_t* titles = kit::row(left, 12);
@@ -94,16 +92,13 @@ private:
         lv_obj_t* right = kit::column(body, 4);
         lv_obj_set_flex_grow(right, 1);
         lv_obj_set_width(right, 1);
-        lv_obj_set_height(right, 440 + 80);
+        lv_obj_set_height(right, kArt + 80);
         lv_obj_t* head = kit::row(right, 12);
         lv_obj_set_width(head, lv_pct(100));
         lv_obj_set_style_margin_bottom(head, 8, 0);
         lv_obj_t* ht = kit::text(head, tr(radio ? i18n::Str::np_live_radio : i18n::Str::np_up_next), theme::h2(), theme::text());
         lv_obj_set_flex_grow(ht, 1);
-        if (!radio) {
-            bool shuffle = q && q->shuffle;
-            kit::chip(head, icon::shuffle, tr(i18n::Str::queue_shuffle), shuffle, [shuffle] { send(app::cmd::SetShuffle{!shuffle}); });
-        }
+        lv_obj_set_style_pad_left(ht, kRowInset, 0);  // in line with the row content below, not the row edge
         if (radio) {
             kit::text(right, tr(i18n::Str::np_radio_hint), theme::meta(), theme::text2(), true);
             return;
@@ -114,7 +109,7 @@ private:
         kit::media_row(right, *item, cur);
         size_t first = q && q->current_index >= 0 ? static_cast<size_t>(q->current_index) + 1 : 0;
         size_t shown = 0;
-        for (size_t i = first; q && i < q->items.size() && shown < 6; ++i, ++shown) {
+        for (size_t i = first; q && i < q->items.size() && shown < 7; ++i, ++shown) {
             const core::QueueItem& qi = q->items[i];
             core::MediaItem m = qi.media ? *qi.media : core::MediaItem{};
             if (!qi.media) m.name = qi.name;
@@ -126,6 +121,10 @@ private:
         if (!shown) kit::text(right, tr(i18n::Str::queue_empty), theme::meta(), theme::text2(), true);
     }
 
+    // 512: the size the artwork proxy delivers, and the tallest cover that leaves room for the
+    // title above the player bar (704 − 80 header − 112 title and padding).
+    static constexpr int32_t kArt = 512;
+    static constexpr int32_t kRowInset = 8;  // media_row's own horizontal padding
     lv_obj_t* root_ = nullptr;
 };
 

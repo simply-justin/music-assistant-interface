@@ -2,6 +2,8 @@
 
 #include <cstdio>
 
+#include "i18n/i18n.hpp"
+
 namespace ui {
 
 namespace {
@@ -46,6 +48,15 @@ std::string duration(uint32_t t) {
     if (h) snprintf(buf, sizeof buf, "%u:%02u:%02u", h, m, s);
     else snprintf(buf, sizeof buf, "%u:%02u", static_cast<unsigned>(t / 60), s);
     return buf;
+}
+
+std::string total_duration(uint32_t t) {
+    unsigned h = static_cast<unsigned>(t / 3600), m = static_cast<unsigned>((t + 30) / 60 % 60);  // round to the minute
+    if (t % 3600 >= 3570) ++h, m = 0;
+    std::string minutes = i18n::tr(i18n::Str::total_minutes, std::to_string(m));
+    if (!h) return minutes;
+    std::string hours = i18n::tr(i18n::Str::total_hours, std::to_string(h));
+    return m ? hours + " " + minutes : hours;
 }
 
 }  // namespace ui

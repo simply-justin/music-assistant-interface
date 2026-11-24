@@ -435,6 +435,80 @@ std::string clock_text(int minutes) {
     return buf;
 }
 
+// ---- Grouped rows (Settings, setup): a titled card on `surface`, rows split by hairlines.
+
+
+lv_obj_t* group(lv_obj_t* parent, const std::string& title) {
+    lv_obj_t* g = kit::column(parent, 10);
+    lv_obj_set_width(g, lv_pct(100));
+    if (!title.empty()) {
+        lv_obj_t* t = kit::overline(g, title, theme::text3());
+        lv_obj_set_style_pad_left(t, kRowPad, 0);
+    }
+    lv_obj_t* c = kit::column(g, 0);
+    lv_obj_set_width(c, lv_pct(100));
+    lv_obj_set_style_pad_hor(c, kRowPad, 0);
+    lv_obj_set_style_radius(c, theme::r_card(), 0);
+    lv_obj_set_style_bg_color(c, theme::surface(), 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    return c;
+}
+
+// Grey text under a group, aligned with the row text.
+void footnote(lv_obj_t* card, const std::string& s) {
+    lv_obj_t* t = kit::text(lv_obj_get_parent(card), s, theme::label(), theme::text3(), true);
+    lv_obj_set_width(t, lv_pct(100));
+    lv_obj_set_style_pad_hor(t, kRowPad, 0);
+}
+
+// A row in a group; rows after the first get a hairline on top.
+lv_obj_t* line(lv_obj_t* card, int32_t height) {
+    bool first = lv_obj_get_child_count(card) == 0;
+    lv_obj_t* r = kit::row(card, 16);
+    lv_obj_set_width(r, lv_pct(100));
+    lv_obj_set_height(r, height > 0 ? height : LV_SIZE_CONTENT);  // 0 = as tall as its content (preview tiles)
+    lv_obj_set_style_pad_ver(r, 4, 0);  // controls (56 px hit areas) fit inside the 64 px row
+    if (!first) {
+        lv_obj_set_style_border_side(r, LV_BORDER_SIDE_TOP, 0);
+        lv_obj_set_style_border_width(r, 1, 0);
+        lv_obj_set_style_border_color(r, theme::hairline(), 0);
+    }
+    return r;
+}
+
+lv_obj_t* grow_text(lv_obj_t* r, const std::string& s, const std::string& sub) {
+    lv_obj_t* col = kit::column(r, 2);
+    lv_obj_set_flex_grow(col, 1);
+    lv_obj_set_width(col, 1);
+    kit::text(col, s, theme::meta(), theme::text());
+    if (!sub.empty()) kit::text(col, sub, theme::label(), theme::text2());
+    return col;
+}
+
+void value_row(lv_obj_t* card, const std::string& label, const std::string& value, lv_color_t colour) {
+    lv_obj_t* r = line(card);
+    grow_text(r, label);
+    lv_obj_t* v = kit::text(r, value, theme::meta(), colour);
+    lv_obj_set_style_max_width(v, 360, 0);
+}
+
+void toggle_row(lv_obj_t* card, const std::string& label, const std::string& sub, bool on, std::function<void(bool)> changed) {
+    lv_obj_t* r = line(card, sub.empty() ? 64 : 72);
+    grow_text(r, label, sub);
+    kit::toggle(r, on, std::move(changed));
+}
+
+// Whole row is the button (text in the accent, or warning for destructive ones).
+void action_row(lv_obj_t* card, const char* glyph, const std::string& label, kit::Action action, bool danger) {
+    lv_obj_t* r = line(card);
+    lv_obj_set_style_bg_color(r, theme::elevated(), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(r, LV_OPA_COVER, LV_STATE_PRESSED);
+    lv_color_t c = danger ? theme::warning() : theme::accent();
+    if (glyph) kit::icon(r, glyph, 22, c);
+    kit::text(r, label, theme::meta(), c);
+    kit::on_click(r, std::move(action));
+}
+
 lv_obj_t* card(lv_obj_t* parent, const std::string& title) {
     lv_obj_t* c = kit::column(parent, 12);
     lv_obj_set_width(c, lv_pct(100));
@@ -476,10 +550,11 @@ lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& 
     lv_obj_set_width(b, lv_pct(100));
     lv_obj_set_style_pad_all(b, 20, 0);
     lv_obj_set_style_radius(b, theme::r_card(), 0);
-    lv_obj_set_style_bg_color(b, lv_color_hex(0x2A2416), 0);
+    // A warning tint of the page, in either theme (was a fixed dark brown, wrong in light mode).
+    lv_obj_set_style_bg_color(b, lv_color_mix(theme::warning(), theme::bg(), 28), 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(b, 1, 0);
-    lv_obj_set_style_border_color(b, lv_color_hex(0x5A4A22), 0);
+    lv_obj_set_style_border_color(b, lv_color_mix(theme::warning(), theme::bg(), 90), 0);
     kit::icon(b, icon::warning, 32, theme::warning());
     lv_obj_t* col = kit::column(b, 4);
     lv_obj_set_flex_grow(col, 1);

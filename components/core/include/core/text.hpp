@@ -5,9 +5,8 @@
 
 namespace core {
 
-// Lowercases ASCII, turns ASCII punctuation into spaces and collapses whitespace.
-// Non-ASCII bytes are kept as-is (shortcut: no accent folding; "Beyoncé" != "Beyonce", upgrade if
-// real-world dupes are missed because of it).
+// Lowercases ASCII, folds accented Latin letters to ASCII ("Beyoncé" → "beyonce", "Straße" →
+// "strasse"), turns punctuation into spaces and collapses whitespace. Other scripts are kept as-is.
 std::string normalize(std::string_view s);
 
 // A title split into its base and its version markers, e.g.
