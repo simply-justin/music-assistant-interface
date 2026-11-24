@@ -38,7 +38,8 @@ public:
         std::string a = server_address;
         later(1500, [a, done] { done({{"Music Assistant", a}}); });
     }
-    std::string pairing_start(std::function<void(std::string)> on_token) override {
+    std::string pairing_start(const std::string& server, std::function<void(std::string)> on_token) override {
+        last_pairing_server = server;
         if (!token.empty()) {
             std::string t = token;
             later(3000, [t, on_token] { on_token(t); });
@@ -55,6 +56,7 @@ public:
     }
     void restart() override { restarted = true; }
     bool restarted = false;
+    std::string last_pairing_server;
 
 private:
     void later(uint32_t ms, std::function<void()> fn) { jobs_.emplace_back(now_ + ms, std::move(fn)); }

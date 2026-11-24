@@ -700,6 +700,9 @@ void apply(app::Update update) {
         }
         if (!(*pv)->server_address.empty()) art::set_base("http://" + (*pv)->server_address);
         apply_diagnostics();
+        // Status arrives every 30 s (uptime, Wi-Fi). Only Settings and the start-up screen show it;
+        // rebuilding any other screen would cancel a tap in progress for nothing.
+        if (s.current != ScreenId::Settings && s.current != ScreenId::Boot) return;
         topic = Topic::Panel;
     } else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&update)) {
         bool same = s.state.players && signature(**p) == signature(*s.state.players);

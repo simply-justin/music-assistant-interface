@@ -43,6 +43,7 @@ struct Panel {
     std::unique_ptr<app::App> core;
     std::shared_ptr<const app::PlayersView> players;  // newest, for checks
     std::shared_ptr<const core::QueueState> queue;
+    std::shared_ptr<const app::PanelView> panel;
 
     explicit Panel(bool first_time_setup) {
         if (first_time_setup) {
@@ -55,6 +56,7 @@ struct Panel {
         core = std::make_unique<app::App>(mock, settings, platform, [this](app::Update u) {
             if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
             if (auto* q = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) queue = *q;
+            if (auto* v = std::get_if<std::shared_ptr<const app::PanelView>>(&u)) panel = *v;
             inbox.push_back(std::move(u));
         });
         core->start();
@@ -322,6 +324,26 @@ TEST(tapping_a_favourite_plays_it) {
             ++bar_hits;
     });
     CHECK(title && bar_hits == 1);
+}
+
+// The panel publishes its status (uptime, Wi-Fi) every 30 s. A tap that is in progress when one
+// arrives must still land: the screen under the finger must not be rebuilt for data it doesn't show.
+TEST(tap_survives_a_status_update) {
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(300);
+    lv_obj_t* tile = find_text("NPO Radio 2");
+    CHECK(tile && g_panel->panel);
+    if (!tile || !g_panel->panel) return;
+    auto status = std::make_shared<app::PanelView>(*g_panel->panel);
+    status->system.uptime_s += 30;
+    g_finger.at = center(tile);
+    g_finger.down = true;
+    g_panel->run(60);
+    ui::apply(std::shared_ptr<const app::PanelView>(status));  // arrives mid-press
+    g_panel->run(60);
+    g_finger.down = false;
+    g_panel->run(800);
+    CHECK(g_panel->queue && !g_panel->queue->items.empty() && g_panel->queue->items[0].name == "NPO Radio 2");
 }
 
 TEST(language_switch_applies_instantly) {

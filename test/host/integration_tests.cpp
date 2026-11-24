@@ -169,6 +169,7 @@ TEST(test_setup_flow) {
     a.handle(app::cmd::SetupUseServer{"192.168.2.80"});
     run(200);
     CHECK(view->step == app::SetupStep::SignIn && !view->pairing_url.empty());
+    CHECK(platform.last_pairing_server == "192.168.2.80");  // the page names the server the token goes to
     CHECK(settings.get("server_url") == "ws://192.168.2.80:8095/ws");
     a.handle(app::cmd::SetupToken{"bad"});
     run(200);

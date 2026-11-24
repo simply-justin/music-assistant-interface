@@ -40,17 +40,19 @@ std::string_view trim(std::string_view s) {
 }
 
 struct Text {
-    const char *title, *intro, *label, *button, *rejected, *thanks;
+    const char *title, *intro, *server, *label, *button, *rejected, *thanks;
 };
 
 const Text& text(std::string_view lang) {
     static const Text en{"Sign in the music panel",
                          "In Music Assistant, open your profile, create a long-lived token and paste it here.",
+                         "The panel signs in to the Music Assistant at",
                          "Token", "Send to the panel",
                          "That didn't look like a token. Copy the whole token and try again.",
                          "Sent. Look at the panel: it signs in by itself. You can close this page."};
     static const Text nl{"Het muziekscherm aanmelden",
                          "Open in Music Assistant je profiel, maak een langlevend token aan en plak het hier.",
+                         "Het scherm meldt zich aan bij de Music Assistant op",
                          "Token", "Naar het scherm sturen",
                          "Dat leek geen token. Kopieer het hele token en probeer opnieuw.",
                          "Verstuurd. Kijk op het scherm: het meldt zich vanzelf aan. Je kunt deze pagina sluiten."};
@@ -82,9 +84,26 @@ std::string new_code(uint32_t (*random32)()) {
     return code;
 }
 
-std::string form_page(std::string_view lang, bool rejected) {
+// Escapes text for HTML (the server address is typed during setup).
+std::string escape(std::string_view s) {
+    std::string out;
+    for (char c : s) {
+        switch (c) {
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            case '"': out += "&quot;"; break;
+            case '\'': out += "&#39;"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
+std::string form_page(std::string_view lang, std::string_view server, bool rejected) {
     const Text& t = text(lang);
     std::string body = std::string("<h1>") + t.title + "</h1><p>" + t.intro + "</p>";
+    if (!server.empty()) body += std::string("<p>") + t.server + " <strong>" + escape(server) + "</strong>.</p>";
     if (rejected) body += std::string("<p class=\"err\" role=\"alert\">") + t.rejected + "</p>";
     body += std::string("<form method=\"post\"><label for=\"token\">") + t.label +
             "</label><textarea id=\"token\" name=\"token\" required autocomplete=\"off\" autocapitalize=\"off\" "

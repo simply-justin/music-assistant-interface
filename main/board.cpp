@@ -48,7 +48,8 @@ struct BoardPlatform::State {
     std::string ip;
 
     httpd_handle_t http = nullptr;
-    std::string code;  // pairing page path
+    std::string code;    // pairing page path
+    std::string server;  // shown on the page: where the token will go
     std::function<void(std::string)> on_token;
 
     void finish_join(app::WifiResult r) {
@@ -159,21 +160,29 @@ esp_err_t send_page(httpd_req_t* req, const std::string& html) {
 
 const char* lang_code() { return i18n::kLangCodes[static_cast<int>(i18n::language())]; }
 
-esp_err_t pairing_get(httpd_req_t* req) { return send_page(req, pairing::form_page(lang_code())); }
+std::string server_of(httpd_req_t* req) {
+    auto* s = static_cast<BoardPlatform::State*>(req->user_ctx);
+    std::lock_guard<std::mutex> l(s->mu);
+    return s->server;
+}
+
+esp_err_t pairing_get(httpd_req_t* req) { return send_page(req, pairing::form_page(lang_code(), server_of(req))); }
 
 esp_err_t pairing_post(httpd_req_t* req) {
     auto* s = static_cast<BoardPlatform::State*>(req->user_ctx);
-    if (req->content_len > pairing::kMaxToken * 3 + 16) return send_page(req, pairing::form_page(lang_code(), true));
+    if (req->content_len > pairing::kMaxToken * 3 + 16) return send_page(req, pairing::form_page(lang_code(), server_of(req), true));
     std::string body(req->content_len, '\0');
     size_t got = 0;
+    int timeouts = 0;
     while (got < body.size()) {
         int n = httpd_req_recv(req, body.data() + got, body.size() - got);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        // The server has one task: a client that stalls must not hold it for the whole setup.
+        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
         if (n <= 0) return ESP_FAIL;
         got += static_cast<size_t>(n);
     }
     auto token = pairing::token_from_form(body);
-    if (!token) return send_page(req, pairing::form_page(lang_code(), true));
+    if (!token) return send_page(req, pairing::form_page(lang_code(), server_of(req), true));
     std::function<void(std::string)> on_token;
     {
         std::lock_guard<std::mutex> l(s->mu);
@@ -308,7 +317,7 @@ void BoardPlatform::discover_servers(std::function<void(std::vector<app::ServerC
     }
 }
 
-std::string BoardPlatform::pairing_start(std::function<void(std::string)> on_token) {
+std::string BoardPlatform::pairing_start(const std::string& server, std::function<void(std::string)> on_token) {
     pairing_stop();
     std::string ip = wifi_status().ip;
     if (ip.empty()) return {};  // no network: setup falls back to typing the token
@@ -322,6 +331,7 @@ std::string BoardPlatform::pairing_start(std::function<void(std::string)> on_tok
         std::lock_guard<std::mutex> l(s_->mu);
         s_->http = h;
         s_->code = "/" + code;
+        s_->server = server;
         s_->on_token = std::move(on_token);
     }
     httpd_uri_t get{};

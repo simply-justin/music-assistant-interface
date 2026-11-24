@@ -102,7 +102,7 @@ private:
         if (step == SetupStep::Wifi && view_.networks.empty()) return scan();
         if (step == SetupStep::Server && view_.servers.empty()) return find_servers();
         if (step == SetupStep::SignIn && view_.pairing_url.empty()) {
-            view_.pairing_url = ctx_.platform.pairing_start([this](std::string token) {
+            view_.pairing_url = ctx_.platform.pairing_start(view_.address, [this](std::string token) {
                 ctx_.dispatch(cmd::SetupToken{std::move(token)});  // the phone sent it
             });
         }

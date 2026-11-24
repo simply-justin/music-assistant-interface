@@ -42,7 +42,9 @@ public:
     // Music Assistant servers on the local network (mDNS on the board).
     virtual void discover_servers(std::function<void(std::vector<ServerCandidate>)> done) = 0;
     // Serves a small page where a phone can paste the token. Returns the URL to show (and QR).
-    virtual std::string pairing_start(std::function<void(std::string token)> on_token) = 0;
+    // `server` (host:port) is shown on the page, so the user can check the panel signs in to
+    // their own Music Assistant and not to look-alike announced by another device on the network.
+    virtual std::string pairing_start(const std::string& server, std::function<void(std::string token)> on_token) = 0;
     virtual void pairing_stop() = 0;
     virtual void set_brightness(int percent) = 0;
     virtual SystemInfo system_info() = 0;

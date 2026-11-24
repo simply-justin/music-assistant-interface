@@ -350,7 +350,9 @@ TEST(pairing_page_and_code) {
     static uint32_t n = 0;
     std::string code = pairing::new_code([] { return n++ * 7u; });
     CHECK(code.size() == 6 && code.find_first_of("01ilo") == std::string::npos);
-    std::string en = pairing::form_page("en"), nl = pairing::form_page("nl", true);
+    std::string en = pairing::form_page("en", "192.168.1.20:8095"), nl = pairing::form_page("nl", "", true);
+    CHECK(en.find("<strong>192.168.1.20:8095</strong>") != std::string::npos);  // where the token goes
+    CHECK(pairing::form_page("en", "<script>x</script>").find("<script>") == std::string::npos);
     CHECK(en.find("<form method=\"post\">") != std::string::npos && en.find("name=\"token\"") != std::string::npos);
     CHECK(nl.find("lang=\"nl\"") != std::string::npos && nl.find("role=\"alert\"") != std::string::npos);
     CHECK(pairing::thanks_page("en").find("close this page") != std::string::npos);

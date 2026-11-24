@@ -14,8 +14,9 @@ namespace pairing {
 // `random32` supplies randomness (esp_random on the board).
 std::string new_code(uint32_t (*random32)());
 
-// The form (GET) and the reply after a post. `lang` is "en" or "nl".
-std::string form_page(std::string_view lang, bool rejected = false);
+// The form (GET) and the reply after a post. `lang` is "en" or "nl". `server` (host:port) is
+// named on the page so the user can check the token goes to their own Music Assistant.
+std::string form_page(std::string_view lang, std::string_view server, bool rejected = false);
 std::string thanks_page(std::string_view lang);
 
 // The token from an application/x-www-form-urlencoded body ("token=..."), trimmed. Empty or

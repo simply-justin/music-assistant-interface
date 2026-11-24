@@ -28,7 +28,11 @@ public:
     }
 
     void refresh(Topic t) override {
-        if (t == Topic::Progress || t == Topic::Search || t == Topic::Setup) return;
+        // Home shows lists, favourites and the connection, not the speakers or the queue (the
+        // player bar does): skip those, so playback changes don't rebuild the page under a finger.
+        if (t == Topic::Progress || t == Topic::Search || t == Topic::Setup || t == Topic::Players || t == Topic::Queue ||
+            t == Topic::Panel)
+            return;
         rebuild();
     }
 

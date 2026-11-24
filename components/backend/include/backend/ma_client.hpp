@@ -35,6 +35,7 @@ private:
     Session session_;
     esp_websocket_client_handle_t ws_ = nullptr;
     std::string rx_;  // reassembles one message split over several data events (websocket task only)
+    bool rx_too_big_ = false;  // the message being received is over kMaxMessage: drop it
     backend::Backoff backoff_;  // core task only
 };
 

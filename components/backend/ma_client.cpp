@@ -7,6 +7,8 @@ namespace ma {
 
 namespace {
 constexpr const char* TAG = "ma";
+// Largest message accepted. Real replies are well under this (a 500-track list is ~1–2 MB).
+constexpr size_t kMaxMessage = 8u << 20;
 }
 
 Client::Client(std::string url, std::string token, std::string expected_server_id, Post post)
@@ -79,13 +81,27 @@ void Client::on_ws_event(void* arg, const char*, int32_t id, void* event_data) {
             break;
         case WEBSOCKET_EVENT_DATA: {
             if (d->op_code != 0x1 && d->op_code != 0x0) break;  // text + continuation only
-            if (d->op_code == 0x1 && d->payload_offset == 0) self->rx_.clear();
-            self->rx_.append(d->data_ptr, d->data_len);
+            if (d->op_code == 0x1 && d->payload_offset == 0) {
+                self->rx_.clear();
+                self->rx_too_big_ = false;
+            }
+            // A message larger than any real reply (a misbehaving or fake server) is dropped
+            // instead of growing until memory runs out.
+            if (self->rx_too_big_ || self->rx_.size() + static_cast<size_t>(d->data_len) > kMaxMessage) {
+                if (!self->rx_too_big_) ESP_LOGW(TAG, "message over %u bytes dropped", static_cast<unsigned>(kMaxMessage));
+                self->rx_too_big_ = true;
+                std::string().swap(self->rx_);
+            } else {
+                self->rx_.append(d->data_ptr, d->data_len);
+            }
             bool frame_done = d->payload_offset + d->data_len >= d->payload_len;
             if (frame_done && d->fin) {
-                auto text = std::make_shared<std::string>(std::move(self->rx_));
+                if (!self->rx_too_big_) {
+                    auto text = std::make_shared<std::string>(std::move(self->rx_));
+                    self->post_([self, text] { self->session_.on_text(*text); });
+                }
                 self->rx_.clear();
-                self->post_([self, text] { self->session_.on_text(*text); });
+                self->rx_too_big_ = false;
             }
             break;
         }

@@ -20,7 +20,7 @@ public:
     void wifi_join(const std::string& ssid, const std::string& password, std::function<void(app::WifiResult)> done) override;
     app::WifiStatus wifi_status() override;
     void discover_servers(std::function<void(std::vector<app::ServerCandidate>)> done) override;
-    std::string pairing_start(std::function<void(std::string token)> on_token) override;
+    std::string pairing_start(const std::string& server, std::function<void(std::string token)> on_token) override;
     void pairing_stop() override;
     void set_brightness(int percent) override;
     app::SystemInfo system_info() override;
