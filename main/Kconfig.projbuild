@@ -2,21 +2,41 @@ menu "Music panel"
 
     choice PANEL_BACKEND
         prompt "Backend"
-        default PANEL_BACKEND_MOCK
+        default PANEL_BACKEND_MA
         config PANEL_BACKEND_MOCK
             bool "Mock (no server needed)"
         config PANEL_BACKEND_MA
             bool "Music Assistant"
     endchoice
 
-    # Development only: the Setup screens replace these once the UI exists.
+    # Development only: when set, the panel skips first-time setup and uses these.
+    # Leave empty for a real device: setup asks for the server and the token.
     config PANEL_MA_URL
-        string "Music Assistant WebSocket URL"
-        default "ws://homeassistant.local:8095/ws"
+        string "Music Assistant WebSocket URL (development only)"
+        default ""
         depends on PANEL_BACKEND_MA
     config PANEL_MA_TOKEN
         string "Music Assistant token (empty if not required)"
         default ""
         depends on PANEL_BACKEND_MA
+
+    choice PANEL_ROTATION
+        prompt "Screen orientation"
+        default PANEL_ROTATION_90
+        help
+            The 10.1" panel is portrait (800x1280); the UI is landscape. Pick the rotation that
+            puts the image the right way up for how the panel is mounted.
+        config PANEL_ROTATION_90
+            bool "Landscape, rotated 90 degrees"
+        config PANEL_ROTATION_270
+            bool "Landscape, rotated 270 degrees"
+    endchoice
+
+    config PANEL_TIMEZONE
+        string "Time zone (POSIX TZ)"
+        default "CET-1CEST,M3.5.0,M10.5.0/3"
+        help
+            Used for the clock and the night schedule. The default is Central European Time
+            (Amsterdam, Berlin, Paris). Example for London: GMT0BST,M3.5.0/1,M10.5.0
 
 endmenu

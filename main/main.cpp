@@ -1,13 +1,17 @@
-// Wires the core to FreeRTOS: one core task owns the App; two queues carry commands in
-// (UI -> core) and updates out (core -> UI). The UI task arrives with the approved design;
-// until then a stub drains and logs the updates.
+// Wires the panel together: the display and touch (Waveshare BSP + esp_lvgl_adapter), the core
+// task that owns the App, and two queues between them: commands in (UI -> core) and updates out
+// (core -> UI). An LVGL timer drains the updates and finished artwork on the GUI task.
+#include <atomic>
 #include <memory>
 #include <variant>
 
 #include "app/app.hpp"
 #include "backend/ma_client.hpp"
 #include "backend/mock_backend.hpp"
-#include <ctime>
+#include "board.hpp"
+#include "board_art.hpp"
+#include "bsp/esp-bsp.h"
+#include "ui/ui.hpp"
 
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
@@ -31,7 +35,7 @@ QueueHandle_t g_updates;  // app::Update*: drained by the UI
 
 uint32_t now_ms() { return static_cast<uint32_t>(esp_timer_get_time() / 1000); }
 
-[[maybe_unused]] void post_job(Job fn) {  // unused with the mock backend
+void post_job(Job fn) {
     auto* job = new Job(std::move(fn));
     if (xQueueSend(g_jobs, &job, pdMS_TO_TICKS(50)) != pdTRUE) {
         ESP_LOGE(TAG, "core queue full, job dropped");
@@ -72,38 +76,13 @@ private:
     nvs_handle_t h_{};
 };
 
-// shortcut: Wi-Fi (ESP32-C6 via esp_wifi_remote), mDNS discovery, the pairing web page and the
-// backlight arrive with the board package in Phase 2b; until then they report "not available".
-class BoardPlatform : public app::Platform {
-public:
-    void wifi_scan(std::function<void(std::vector<app::WifiNetwork>)> done) override { done({}); }
-    void wifi_join(const std::string&, const std::string&, std::function<void(app::WifiResult)> done) override {
-        done(app::WifiResult::Failed);
-    }
-    app::WifiStatus wifi_status() override { return {}; }
-    void discover_servers(std::function<void(std::vector<app::ServerCandidate>)> done) override { done({}); }
-    std::string pairing_start(std::function<void(std::string)>) override { return {}; }
-    void pairing_stop() override {}
-    void set_brightness(int percent) override { ESP_LOGI(TAG, "brightness %d %%", percent); }
-    app::SystemInfo system_info() override {
-        return {esp_app_get_description()->version, static_cast<uint32_t>(esp_timer_get_time() / 1000000),
-                static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
-                static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024)};
-    }
-    int local_minutes() override {
-        std::time_t t = std::time(nullptr);  // shortcut: needs SNTP + timezone (Phase 2b) to be local time
-        std::tm lt{};
-        localtime_r(&t, &lt);
-        return lt.tm_hour * 60 + lt.tm_min;
-    }
-    void restart() override { esp_restart(); }
-};
+std::atomic<app::App*> g_app{nullptr};  // set by the core task once the App exists; used only there
 
 void core_task(void*) {
     static NvsSettings settings;
-    static BoardPlatform platform;
+    static board::BoardPlatform platform(post_job);
 #if CONFIG_PANEL_BACKEND_MA
-    // Development shortcut until the Setup screens run on the board: seed from menuconfig.
+    // Development shortcut: a URL in menuconfig skips first-time setup.
     if (settings.get("server_url").empty() && CONFIG_PANEL_MA_URL[0]) {
         settings.set("server_url", CONFIG_PANEL_MA_URL);
         settings.set("token", CONFIG_PANEL_MA_TOKEN);
@@ -114,6 +93,7 @@ void core_task(void*) {
     static backend::MockBackend backend;
 #endif
     static app::App app(backend, settings, platform, publish);
+    g_app = &app;
     app.start();
     for (;;) {
         Job* job = nullptr;
@@ -127,21 +107,38 @@ void core_task(void*) {
     }
 }
 
-// shortcut: logs updates until the LVGL UI exists; replaced by an lv_timer drain in Phase 3.
-void ui_stub_task(void*) {
-    for (;;) {
-        app::Update* u = nullptr;
-        if (xQueueReceive(g_updates, &u, portMAX_DELAY) != pdTRUE) continue;
-        if (auto* c = std::get_if<app::ConnectionView>(u))
-            ESP_LOGI(TAG, "connection %d, server %s", static_cast<int>(c->state), c->server.server_version.c_str());
-        else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(u))
-            ESP_LOGI(TAG, "%u players, selected %s", static_cast<unsigned>((*p)->players.size()), (*p)->selected_id.c_str());
-        else if (auto* q = std::get_if<std::shared_ptr<const core::QueueState>>(u))
-            ESP_LOGI(TAG, "queue: %u items", static_cast<unsigned>((*q)->items.size()));
-        else if (auto* t = std::get_if<app::Toast>(u))
-            ESP_LOGI(TAG, "toast: %s", t->text.c_str());
+// GUI task (LVGL timer, lock held): hand every update and finished image to the UI.
+void drain_updates(lv_timer_t*) {
+    app::Update* u = nullptr;
+    while (xQueueReceive(g_updates, &u, 0) == pdTRUE) {
+        ui::apply(std::move(*u));
         delete u;
     }
+    board::art_drain();
+}
+
+void start_ui() {
+    bsp_display_cfg_t cfg{};
+    cfg.lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
+    // The 10.1" panel is 800×1280 portrait: rotate to 1280×800 landscape. The adapter rotates
+    // touch with the display; menuconfig picks 90° or 270° to match how the panel hangs.
+#if CONFIG_PANEL_ROTATION_270
+    cfg.rotation = ESP_LV_ADAPTER_ROTATE_270;
+#else
+    cfg.rotation = ESP_LV_ADAPTER_ROTATE_90;
+#endif
+    cfg.tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_TRIPLE_PARTIAL;
+    if (!bsp_display_start_with_config(&cfg)) {
+        ESP_LOGE(TAG, "display did not start");
+        return;
+    }
+    bsp_display_backlight_on();
+    board::art_start();
+    bsp_display_lock(0);
+    ui::set_art_loader([](ui::ArtRequest r, auto done) { board::art_load(std::move(r), std::move(done)); }, 24u << 20);
+    ui::start([](app::Command c) { post_job([c = std::move(c)]() mutable { g_app.load()->handle(std::move(c)); }); });
+    lv_timer_create(drain_updates, 10, nullptr);
+    bsp_display_unlock();
 }
 
 }  // namespace
@@ -157,5 +154,6 @@ extern "C" void app_main() {
     g_jobs = xQueueCreate(32, sizeof(Job*));
     g_updates = xQueueCreate(32, sizeof(app::Update*));
     xTaskCreate(core_task, "core", 12 * 1024, nullptr, 5, nullptr);
-    xTaskCreate(ui_stub_task, "ui_stub", 4 * 1024, nullptr, 4, nullptr);
+    while (!g_app) vTaskDelay(pdMS_TO_TICKS(5));  // the UI's first screen already sends commands
+    start_ui();
 }

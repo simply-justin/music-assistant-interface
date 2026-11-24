@@ -20,7 +20,7 @@
 Music Assistant brings Spotify, YouTube Music, radio and your own files together and plays them on any speaker in the house. This project puts all of that on a screen on the wall, so anyone in the house can start the music with one tap, without unlocking a phone or opening an app.
 
 > [!NOTE]
-> The application is in active development. It runs in the PC simulator against a mock or a real Music Assistant server, and it builds for the ESP32-P4. Board support (display, touch, Wi-Fi and backlight drivers) is not implemented yet; see [Roadmap](#roadmap).
+> The application is in active development. It runs in the PC simulator against a mock or a real Music Assistant server. The firmware, including board support, builds for the ESP32-P4 but has not run on the device yet; see [Roadmap](#roadmap).
 
 ## Features
 
@@ -87,10 +87,8 @@ The [Getting started](docs/getting-started.md) tutorial covers the prerequisites
 | First-time setup flow (logic and screens) | Done |
 | PC simulator, command-line test client | Done |
 | Unit, integration and end-to-end tests, CI on every push | Done |
-| Board support: display, touch, backlight, Wi-Fi via the ESP32-C6 | Planned |
-| On-device server discovery (mDNS) and the phone pairing page | Planned |
-| Hardware JPEG artwork decoding | Planned |
-| Over-the-air updates | Planned; partition slot reserved |
+| Board support: display, touch, backlight, Wi-Fi via the ESP32-C6, server discovery, phone pairing page, hardware JPEG artwork | Built; not yet verified on the device |
+| Over-the-air updates | Planned; two app slots reserved |
 
 ## Contributing
 

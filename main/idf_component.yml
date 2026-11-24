@@ -1,0 +1,10 @@
+## Board support for the Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1 and the services the panel uses.
+dependencies:
+  idf: ">=5.5"
+  # Display (JD9365, MIPI-DSI), GT911 touch, backlight and the LVGL adapter.
+  waveshare/esp32_p4_wifi6_touch_lcd_x: "^2.0.3"
+  # Wi-Fi through the ESP32-C6 co-processor (SDIO): the esp_wifi API, served by the C6.
+  # esp_wifi_remote brings esp_hosted on the ESP32-P4.
+  espressif/esp_wifi_remote: "^1.6"
+  # Finding Music Assistant (_mass._tcp) on the network.
+  espressif/mdns: "^1.15"

@@ -222,8 +222,9 @@ lv_obj_t* icon(lv_obj_t* parent, const char* glyph, int size, lv_color_t colour)
 
 lv_obj_t* button(lv_obj_t* parent, Button kind, const char* glyph, const std::string& label, Action action) {
     lv_obj_t* b = row(parent, 10);
-    lv_obj_set_height(b, kind == Button::Secondary || kind == Button::Ghost ? 48 : theme::kSecondary);
-    lv_obj_set_ext_click_area(b, (theme::kMinTap - lv_obj_get_style_height(b, 0)) / 2);  // 48 px looks, 56 px hits
+    int32_t height = kind == Button::Secondary || kind == Button::Ghost ? 48 : theme::kSecondary;
+    lv_obj_set_height(b, height);
+    lv_obj_set_ext_click_area(b, (theme::kMinTap - height) / 2);  // 48 px looks, 56 px hits
     lv_obj_set_style_pad_hor(b, 22, 0);
     lv_obj_set_style_radius(b, theme::r_button(), 0);
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);

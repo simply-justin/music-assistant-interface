@@ -18,18 +18,22 @@ The panel targets **WCAG 2.2 level AA** where it applies to a touch-only wall di
 
 ## Contrast
 
-Required: 4.5:1 for text (1.4.3) and 3:1 for controls and graphics (1.4.11). The ratios below come from the colour tokens in `components/ui/theme.cpp`.
+Required: 4.5:1 for text (1.4.3) and 3:1 for controls and graphics (1.4.11). `test/tools/contrast.py` computes these from the colour tokens in `components/ui/theme.cpp` and runs in CI, so a colour change that breaks a pair fails the build. The worst case over every surface:
 
 | Pair | Dark | Light |
 |---|---|---|
-| `text` on page, sidebar, tile and selected item | ≥ 15:1 | ≥ 14:1 |
-| `text2` on any surface | ≥ 6.4:1 | ≥ 6.6:1 |
-| `text3` on any surface | ≥ 4.8:1 | ≥ 4.6:1 |
-| `warning` on any surface | ≥ 7:1 | ≥ 5.2:1 |
-| Label on any accent colour | ≥ 8.7:1 | ≥ 5.0:1 |
-| Accent against the page (non-text) | ≥ 8.2:1 | ≥ 4.6:1 |
-| `text2` on the artwork-tinted Now Playing page | ≥ 4.9:1 | ≥ 5.8:1 |
-| `text` on artwork-tinted cards | ≥ 10:1 | ≥ 12:1 |
+| `text` on page, sidebar, tile and selected item | 15.5:1 | 14.3:1 |
+| `text2` on any surface | 6.2:1 | 5.9:1 |
+| `text3` on any surface | 4.8:1 | 4.5:1 |
+| `warning` on any surface | 8.0:1 | 5.2:1 |
+| `danger_text` on any surface | 6.5:1 | 5.0:1 |
+| White on the destructive button and the LIVE tag | 6.5:1 and 5.2:1 | same |
+| Label on any accent colour | 8.7:1 | 5.0:1 |
+| Accent against any surface (non-text) | 6.4:1 | 3.8:1 |
+| Toggle off: knob against its track (non-text) | 6.2:1 | 5.9:1 |
+| Text field edge against its fill (non-text) | 5.6:1 | 5.1:1 |
+
+The `border` token (about 1.5:1) is decorative: every control that uses it carries one of the stronger cues above.
 
 Artwork-tinted cards use only the primary text colour, because secondary grey could fall to about 3:1 on mid-tone covers.
 
@@ -40,6 +44,7 @@ Every control has a tap area of at least 56 px (2.5.8 requires 24 px; 56 px allo
 | Control | Visible | Tap area |
 |---|---|---|
 | Sidebar items, pills | 40 px | 56 px (8 px added above and below) |
+| Secondary and ghost buttons | 48 px | 56 px |
 | Tabs, chips | 48 px | 56 px |
 | Icon buttons | 48 px | 56 px (`ext_click_area`) |
 | Rows | 56–72 px | The whole row |

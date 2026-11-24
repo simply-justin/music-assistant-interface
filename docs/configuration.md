@@ -38,11 +38,17 @@ Under **Music panel**:
 
 | Option | Values | Default |
 |---|---|---|
-| Backend | Mock (no server needed) · Music Assistant | Mock |
-| Music Assistant WebSocket URL | `ws://…/ws` | `ws://homeassistant.local:8095/ws` |
+| Backend | Music Assistant · Mock (no server needed) | Music Assistant |
+| Screen orientation | Landscape, rotated 90° · rotated 270° | 90° |
+| Time zone | A POSIX TZ string, for the clock and the night schedule | `CET-1CEST,M3.5.0,M10.5.0/3` (Amsterdam) |
+| Music Assistant WebSocket URL (development only) | `ws://…/ws`, or empty | *(empty)* |
 | Music Assistant token | A long-lived token, or empty | *(empty)* |
 
-The URL and token options are for development. On a finished device, first-time setup stores them instead.
+Leave the URL empty on a real device: the panel then starts with first-time setup, which stores the server and token. A URL here skips setup, which is handy during development.
+
+### Board settings
+
+`sdkconfig.defaults` selects the Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1: the 10.1" JD9365 panel in RGB565, PSRAM, 16 MB flash and Wi-Fi through the ESP32-C6 over SDIO. `partitions.csv` splits the flash into two 6 MB app slots for over-the-air updates, NVS for settings and 1 MB of storage.
 
 ## Stored settings
 

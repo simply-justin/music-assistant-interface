@@ -1,4 +1,5 @@
 // Unit tests: pure functions and single classes, no App, no timing.
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "core/text.hpp"
 #include "i18n/i18n.hpp"
 #include "img/artwork.hpp"
+#include "pairing/pairing.hpp"
 #include "text.hpp"
 
 using namespace core;
@@ -328,6 +330,30 @@ TEST(dedupe_merges_accent_variants) {
     merge_into(shown, {track("spotify", "2", "Deja Vu", "Beyonce", 241)}, {});
     merge_into(shown, {track("library", "1", "Déjà Vu", "BEYONCÉ", 240)}, {});
     CHECK(shown.size() == 1 && shown[0].provider == "library");
+}
+
+TEST(pairing_reads_the_token_from_the_form) {
+    using pairing::token_from_form;
+    CHECK(token_from_form("token=abc.DEF-123_x") == std::optional<std::string>("abc.DEF-123_x"));
+    CHECK(token_from_form("x=1&token=%20eyJhbGciOi%2B%2Fz%3D%0D%0A") == std::optional<std::string>("eyJhbGciOi+/z="));  // trimmed
+    CHECK(!token_from_form("token="));
+    CHECK(!token_from_form("token=+++"));          // only spaces
+    CHECK(!token_from_form("token=ab+cd"));        // a space inside: not a token
+    CHECK(!token_from_form("token=abc%2"));        // cut-off escape
+    CHECK(!token_from_form("token=abc%zz"));
+    CHECK(!token_from_form("name=abc"));
+    CHECK(!token_from_form(std::string("token=") + std::string(pairing::kMaxToken + 1, 'a')));
+    CHECK(token_from_form(std::string("token=") + std::string(pairing::kMaxToken, 'a')).has_value());
+}
+
+TEST(pairing_page_and_code) {
+    static uint32_t n = 0;
+    std::string code = pairing::new_code([] { return n++ * 7u; });
+    CHECK(code.size() == 6 && code.find_first_of("01ilo") == std::string::npos);
+    std::string en = pairing::form_page("en"), nl = pairing::form_page("nl", true);
+    CHECK(en.find("<form method=\"post\">") != std::string::npos && en.find("name=\"token\"") != std::string::npos);
+    CHECK(nl.find("lang=\"nl\"") != std::string::npos && nl.find("role=\"alert\"") != std::string::npos);
+    CHECK(pairing::thanks_page("en").find("close this page") != std::string::npos);
 }
 
 int main() { return check::run_all("unit"); }

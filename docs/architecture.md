@@ -15,7 +15,9 @@ The code is C++17 without exceptions or RTTI. Screens are written by hand from a
 The project is a set of ESP-IDF components:
 
 ```
-main/                 FreeRTOS wiring: the core task, the two queues, NVS settings, backend choice
+main/                 The firmware: display and touch start, the core task, the two queues, NVS settings
+  board.cpp           Platform on the board: Wi-Fi (ESP32-C6), mDNS discovery, pairing server, backlight, clock
+  board_art.cpp       Artwork: esp_http_client + the hardware JPEG decoder
 components/
   core/               Pure domain logic: model, dedupe, title parsing, search session, repeat guard
   backend/            The Backend interface and its implementations
@@ -29,6 +31,7 @@ components/
                         playlists, preferences, queue, search, setup
   i18n/               strings.csv → generated string IDs and tables; i18n::tr()
   img/                Artwork: proxy URLs, scaling with pre-rounded corners, LRU cache with pins
+  pairing/            The phone pairing page: HTML and token parsing (portable, unit-tested)
   ui/                 LVGL 9 UI: theme (tokens), kit (components), shell (sidebar, player bar,
                       navigation, overlays), screens/ (one file per screen), fonts/ (generated)
 test/
@@ -94,7 +97,11 @@ Through its `Context`, a feature can send requests to the server, publish update
 `app::Platform` (`components/app/include/app/platform.hpp`) holds everything that differs between the board and a PC: Wi-Fi scanning and joining, server discovery, the pairing page that receives a token from a phone, the backlight, system information, local time and restart.
 
 - The simulator and tests use `test/host/fake_platform.hpp`.
-- The firmware uses `BoardPlatform` in `main/main.cpp`. Until board support lands, it reports Wi-Fi, discovery and pairing as unavailable.
+- The firmware uses `board::BoardPlatform` in `main/board.cpp`:
+  - **Wi-Fi** through the ESP32-C6 co-processor (`esp_wifi_remote` over SDIO), with the network saved for the next boot and reconnecting by itself.
+  - **Discovery** browses mDNS for `_mass._tcp`, the service Music Assistant announces on its web port.
+  - **Pairing** serves the page from `components/pairing` on port 80, at a random six-character path that the QR code carries, so other devices on the network cannot post a token to a guessable address.
+  - **Backlight** through the Waveshare BSP; **local time** through SNTP and the time zone from menuconfig.
 
 First-time setup (`features/setup.cpp`) and panel settings (`features/panel.cpp`) only talk to this interface, so they are fully tested on the PC.
 
@@ -132,7 +139,6 @@ When the connection drops, the panel shows "Can't reach Music Assistant" with a 
 
 ## Known limitations
 
-- **Board support is not implemented.** Wi-Fi join, mDNS discovery, the token pairing page, backlight PWM and the hardware JPEG decoder are stubs on the device. Set the server and token in menuconfig until then.
+- **Board support is not verified on hardware.** The display, touch, Wi-Fi, discovery, pairing page, backlight, clock and hardware JPEG decoding are written against ESP-IDF 5.5 and the Waveshare BSP, and the firmware builds in CI, but none of it has run on the panel yet. The screen rotation and touch mapping in particular need checking on the device.
 - **Playback errors** appear only when Music Assistant marks the current queue item as unavailable. A richer error signal is an open question.
-- **Dedupe does not fold accents**: it treats "Beyoncé" and "Beyonce" as different names.
 - Wi-Fi via the ESP32-C6, PSRAM, flash size, the partition layout and the chip revision will follow Waveshare's reference examples.
