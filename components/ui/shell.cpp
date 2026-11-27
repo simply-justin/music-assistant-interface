@@ -214,9 +214,11 @@ void refresh_bar() {
         kit::icon_button(controls, icon::shuffle, [on] { send(app::cmd::SetShuffle{!on}); }, 48, 22, false,
                          on ? theme::accent() : theme::text3());
     }
-    if (!radio && (!p || p->can_next_previous)) kit::icon_button(controls, icon::prev, [] { send(app::cmd::Previous{}); }, 48, 28);
+    // Previous/next go to Music Assistant's queue (player_queues/next), which works for every
+    // speaker: the player's own next_previous feature doesn't matter here. Radio has no tracks.
+    if (!radio) kit::icon_button(controls, icon::prev, [] { send(app::cmd::Previous{}); }, 48, 28);
     kit::play_button(controls, s.state.playing(), [] { send(app::cmd::PlayPause{}); }, 52);
-    if (!radio && (!p || p->can_next_previous)) kit::icon_button(controls, icon::next, [] { send(app::cmd::Next{}); }, 48, 28);
+    if (!radio) kit::icon_button(controls, icon::next, [] { send(app::cmd::Next{}); }, 48, 28);
     if (!radio) {
         core::RepeatMode mode = q ? q->repeat : core::RepeatMode::Off;
         core::RepeatMode next = mode == core::RepeatMode::Off ? core::RepeatMode::All : mode == core::RepeatMode::All ? core::RepeatMode::One : core::RepeatMode::Off;

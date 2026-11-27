@@ -298,6 +298,22 @@ TEST(speaker_button_switches_the_speaker) {
     close_overlays();
 }
 
+// Previous/next use Music Assistant's queue, so they show for a speaker that has no next/previous
+// of its own (Kitchen in the mock; on the panel they were missing).
+TEST(previous_and_next_show_for_every_speaker) {
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(300);
+    tap(ui::icon::speaker);
+    tap("Kitchen");
+    g_panel->run(300);
+    CHECK(g_panel->players && g_panel->players->selected_id == "kitchen");
+    CHECK(find_text(ui::icon::next) && find_text(ui::icon::prev));
+    CHECK(tap(ui::icon::next));  // and they act
+    tap(ui::icon::speaker);
+    tap("Living Room");
+    close_overlays();
+}
+
 TEST(search_by_typing_merges_duplicates) {
     CHECK(tap("Search"));
     CHECK(find_type(&lv_buttonmatrix_class));
