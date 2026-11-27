@@ -139,6 +139,7 @@ When the connection drops, the panel shows "Can't reach Music Assistant" with a 
 
 ## Known limitations
 
-- **Board support is not verified on hardware.** The display, touch, Wi-Fi, discovery, pairing page, backlight, clock and hardware JPEG decoding are written against ESP-IDF 5.5 and the Waveshare BSP, and the firmware builds in CI, but none of it has run on the panel yet. The screen rotation and touch mapping in particular need checking on the device.
+- **Board support is partly verified.** On the Waveshare board (chip revision v3.2) the display, touch, rotation and the UI run. Wi-Fi needs the ESP32-C6 co-processor firmware updated: the factory firmware predates esp_hosted 3 and reports version 0.0.0. Discovery, the pairing page, artwork and the clock depend on Wi-Fi and are not verified yet.
+- **Rotation and touch.** The display adapter rotates the image in hardware (LVGL stays at 0°), so touch arrives in the panel's portrait coordinates and is swapped and mirrored by the GT911 driver; see `start_ui()` in `main/main.cpp`. 270° is upright.
 - **Playback errors** appear only when Music Assistant marks the current queue item as unavailable. A richer error signal is an open question.
 - Wi-Fi via the ESP32-C6, PSRAM, flash size, the partition layout and the chip revision will follow Waveshare's reference examples.

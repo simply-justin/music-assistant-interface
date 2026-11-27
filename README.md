@@ -46,7 +46,7 @@ Try the panel on your PC; no hardware is needed. You need Linux (or WSL2), CMake
 
 ```sh
 git clone https://github.com/simply-justin/music-assistant-interface.git && cd music-assistant-interface
-export IDF_PATH=~/esp/v5.5.1/esp-idf
+export IDF_PATH=~/esp/v5.5.6/esp-idf
 cmake -S test/sim -B test/sim/build && cmake --build test/sim/build -j
 test/sim/build/music_panel_sim
 ```
@@ -59,7 +59,7 @@ The [Getting started](docs/getting-started.md) tutorial covers the prerequisites
 |---|---|
 | Display | Waveshare ESP32-P4 10.1" touch panel (1280 × 800), with an ESP32-C6 for Wi-Fi |
 | Music Assistant | 2.x; verified against 2.10.13 (API schema 65) |
-| Toolchain | ESP-IDF 5.5, CMake 3.16+, a C++17 compiler, Python 3 |
+| Toolchain | ESP-IDF 5.5.6 or later (5.5.3+ for chip revision v3), CMake 3.16+, a C++17 compiler, Python 3 |
 
 ## Documentation
 

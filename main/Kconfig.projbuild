@@ -22,7 +22,7 @@ menu "Music panel"
 
     choice PANEL_ROTATION
         prompt "Screen orientation"
-        default PANEL_ROTATION_90
+        default PANEL_ROTATION_270
         help
             The 10.1" panel is portrait (800x1280); the UI is landscape. Pick the rotation that
             puts the image the right way up for how the panel is mounted.

@@ -39,7 +39,7 @@ Under **Music panel**:
 | Option | Values | Default |
 |---|---|---|
 | Backend | Music Assistant · Mock (no server needed) | Music Assistant |
-| Screen orientation | Landscape, rotated 90° · rotated 270° | 90° |
+| Screen orientation | Landscape, rotated 270° · rotated 90° | 270° (upright on the Waveshare board) |
 | Time zone | A POSIX TZ string, for the clock and the night schedule | `CET-1CEST,M3.5.0,M10.5.0/3` (Amsterdam) |
 | Music Assistant WebSocket URL (development only) | `ws://…/ws`, or empty | *(empty)* |
 | Music Assistant token | A long-lived token, or empty | *(empty)* |

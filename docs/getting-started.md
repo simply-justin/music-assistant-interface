@@ -11,14 +11,14 @@ You need:
 - Linux. On Windows, use WSL2: its built-in graphics support (WSLg) shows the simulator window.
 - CMake 3.16 or later, a C++17 compiler (GCC or Clang), Python 3 and Git.
 - The X11 development headers, for the simulator window: `sudo apt install libx11-dev` on Debian or Ubuntu.
-- [ESP-IDF 5.5](https://docs.espressif.com/projects/esp-idf/en/v5.5.1/esp32p4/get-started/). The PC builds use the cJSON library that ships with it.
+- [ESP-IDF 5.5.6 or later](https://docs.espressif.com/projects/esp-idf/en/v5.5.6/esp32p4/get-started/) (5.5.3 is the minimum for ESP32-P4 chip revision v3). The PC builds use the cJSON library that ships with it.
 
 ## 1. Build the simulator
 
 From the repository root:
 
 ```sh
-export IDF_PATH=~/esp/v5.5.1/esp-idf
+export IDF_PATH=~/esp/v5.5.6/esp-idf
 cmake -S test/sim -B test/sim/build
 cmake --build test/sim/build -j
 ```

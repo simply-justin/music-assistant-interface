@@ -1,7 +1,9 @@
 CONFIG_IDF_TARGET="esp32p4"
 CONFIG_FREERTOS_HZ=1000
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
-# Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1. Not yet verified on the board.
+# Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1. Boards ship with chip revision v3.x, which needs
+# ESP-IDF 5.5.3 or later and a build for v3 (firmware for v1.x chips does not boot on v3.x).
+# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"

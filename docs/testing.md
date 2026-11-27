@@ -63,7 +63,7 @@ Scenarios named `setup_*` start from a panel that was never set up; `panel_e2e -
 |---|---|
 | Unit and integration tests | Builds with sanitizers and runs both levels |
 | End-to-end tests | Builds the simulator, runs the scenarios, and uploads a screenshot of every screen as a build artifact |
-| Firmware build | Builds the firmware for the ESP32-P4 with ESP-IDF 5.5.1 |
+| Firmware build | Builds the firmware for the ESP32-P4 with ESP-IDF 5.5.6 |
 
 The unit and integration job also runs `test/tools/contrast.py`, which reads the colour tokens from `components/ui/theme.cpp` and fails when any pair drops below WCAG 2.2 AA.
 

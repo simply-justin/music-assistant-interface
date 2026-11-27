@@ -11,6 +11,7 @@
 #include "board.hpp"
 #include "board_art.hpp"
 #include "bsp/esp-bsp.h"
+#include "esp_lv_adapter.h"
 #include "ui/ui.hpp"
 
 #include "esp_app_desc.h"
@@ -120,12 +121,18 @@ void drain_updates(lv_timer_t*) {
 void start_ui() {
     bsp_display_cfg_t cfg{};
     cfg.lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
-    // The 10.1" panel is 800×1280 portrait: rotate to 1280×800 landscape. The adapter rotates
-    // touch with the display; menuconfig picks 90° or 270° to match how the panel hangs.
+    // The 10.1" panel is 800×1280 portrait: rotate to 1280×800 landscape; menuconfig picks 90° or
+    // 270° to match how the panel hangs (270° is upright on the Waveshare board).
+    // The adapter rotates the image in hardware (LVGL itself stays at 0°), so touch arrives in the
+    // panel's portrait coordinates and is turned here: the GT911 driver mirrors, then swaps x/y.
+    // Measured on the device at 270°: x = 1280 − raw y, y = raw x.
+    cfg.touch_flags.swap_xy = 1;
 #if CONFIG_PANEL_ROTATION_270
     cfg.rotation = ESP_LV_ADAPTER_ROTATE_270;
+    cfg.touch_flags.mirror_y = 1;
 #else
     cfg.rotation = ESP_LV_ADAPTER_ROTATE_90;
+    cfg.touch_flags.mirror_x = 1;
 #endif
     cfg.tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_TRIPLE_PARTIAL;
     if (!bsp_display_start_with_config(&cfg)) {
@@ -134,11 +141,16 @@ void start_ui() {
     }
     bsp_display_backlight_on();
     board::art_start();
-    bsp_display_lock(0);
+    // Wait for the LVGL task to let go (the BSP passes this to esp_lv_adapter_lock, where -1 waits
+    // forever and 0 does not wait at all). The UI must never be built without the lock.
+    if (esp_lv_adapter_lock(-1) != ESP_OK) {
+        ESP_LOGE(TAG, "could not take the LVGL lock");
+        return;
+    }
     ui::set_art_loader([](ui::ArtRequest r, auto done) { board::art_load(std::move(r), std::move(done)); }, 24u << 20);
     ui::start([](app::Command c) { post_job([c = std::move(c)]() mutable { g_app.load()->handle(std::move(c)); }); });
     lv_timer_create(drain_updates, 10, nullptr);
-    bsp_display_unlock();
+    esp_lv_adapter_unlock();
 }
 
 }  // namespace
