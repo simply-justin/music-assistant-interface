@@ -46,7 +46,9 @@ void Client::reconnect() {
 }
 
 void Client::start() {
-    if (url_.empty()) return;  // not set up yet: the Setup flow calls configure()
+    // App::start() calls configure() (which starts the client) and then start(): a second client
+    // here would put two sockets on one session.
+    if (ws_ || url_.empty()) return;  // empty: not set up yet, the Setup flow calls configure()
     esp_websocket_client_config_t cfg = {};
     cfg.uri = url_.c_str();
     cfg.buffer_size = 4096;

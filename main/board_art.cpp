@@ -42,10 +42,10 @@ uint8_t* fetch(const std::string& url, size_t& size) {
     std::vector<uint8_t> body;
     bool ok = esp_http_client_open(h, 0) == ESP_OK && esp_http_client_fetch_headers(h) >= 0 &&
               esp_http_client_get_status_code(h) == 200;
-    uint8_t buf[4096];
-    for (int n; ok && (n = esp_http_client_read(h, reinterpret_cast<char*>(buf), sizeof buf)) > 0;) {
+    std::vector<uint8_t> buf(4096);  // on the heap: the task stack also carries esp_http_client
+    for (int n; ok && (n = esp_http_client_read(h, reinterpret_cast<char*>(buf.data()), static_cast<int>(buf.size()))) > 0;) {
         if (body.size() + static_cast<size_t>(n) > kMaxJpeg) ok = false;
-        else body.insert(body.end(), buf, buf + n);
+        else body.insert(body.end(), buf.begin(), buf.begin() + n);
     }
     esp_http_client_cleanup(h);
     if (!ok || body.empty()) return nullptr;
@@ -123,7 +123,8 @@ void art_start() {
     eng.timeout_ms = 100;
     ESP_ERROR_CHECK(jpeg_new_decoder_engine(&eng, &g_decoder));
     g_wake = xSemaphoreCreateCounting(64, 0);
-    for (int i = 0; i < 2; ++i) xTaskCreate(worker, "art", 6 * 1024, nullptr, 3, nullptr);
+    // 12 KB: esp_http_client and its logging need more than 6 KB (overflowed on the device).
+    for (int i = 0; i < 2; ++i) xTaskCreate(worker, "art", 12 * 1024, nullptr, 3, nullptr);
 }
 
 void art_load(ui::ArtRequest req, std::function<void(std::shared_ptr<img::Bitmap>)> done) {

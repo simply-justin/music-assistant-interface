@@ -48,57 +48,15 @@ dependencies:
       type: service
     version: 1.5.11
   espressif/esp_hosted:
-    component_hash: 22b08509494d4465f0e2f91ee16973d76fe90d5a930fa3910b7a43615db001bf
+    component_hash: acda00d70be52c148b5f1c22e34c83fd182650c8e96ef83e81173627b1b13a0f
     dependencies:
-    - name: cherry-embedded/cherryusb
-      registry_url: https://components.espressif.com
-      require: private
-      rules:
-      - if: target in [esp32p4]
-      - if: $CONFIG{ESP_HOSTED_HOST_USB_CHERRYUSB_MANIFEST} == 1
-      version: '>=1.6.0'
-    - name: espressif/esp_tinyusb
-      registry_url: https://components.espressif.com
-      require: private
-      rules:
-      - if: target in [esp32s2, esp32s3, esp32s31]
-      - if: $CONFIG{ESP_HOSTED_CP_TINYUSB_MANIFEST} == 1
-      version: '*'
-    - name: espressif/iot_usbh_rndis
-      registry_url: https://components.espressif.com
-      require: private
-      rules:
-      - if: target in [esp32p4]
-      - if: $CONFIG{ESP_HOSTED_HOST_USB_RNDIS_MANIFEST} == 1
-      version: ^0.5.2
-    - name: espressif/usb_host_cdc_acm
-      registry_url: https://components.espressif.com
-      require: private
-      rules:
-      - if: target in [esp32p4]
-      - if: $CONFIG{ESP_HOSTED_HOST_USB_CDC_ACM_MANIFEST} == 1
-      version: '*'
     - name: idf
       require: private
-      version: '>=5.5'
+      version: '>=5.3'
     source:
-      registry_url: https://components.espressif.com
+      registry_url: https://components.espressif.com/
       type: service
-    targets:
-    - esp32
-    - esp32s2
-    - esp32s3
-    - esp32s31
-    - esp32c2
-    - esp32c3
-    - esp32c5
-    - esp32c6
-    - esp32c61
-    - esp32h2
-    - esp32h4
-    - esp32h21
-    - esp32p4
-    version: 3.1.0
+    version: 1.4.7
   espressif/esp_lcd_jd9365:
     component_hash: ca0517ca0aaccac53e1eb572fbfc8262086401875a4823862b8bca475843db1a
     dependencies:
@@ -291,25 +249,25 @@ dependencies:
       type: service
     version: 1.8.0
   espressif/esp_wifi_remote:
-    component_hash: faa185898a843b9d7d0456e4094a3b5f1491a48ddd57ce0e5179e13ac6243f2c
+    component_hash: 96d9c79c120e6fb2bb6d430448e1c9edfb753711163d7c9c3afd2b26907ca7b3
     dependencies:
+    - name: espressif/eppp_link
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=0.1'
     - name: espressif/esp_hosted
       registry_url: https://components.espressif.com
       require: private
       rules:
       - if: target in [esp32h2, esp32p4]
-      version: '>=2.11'
-    - name: espressif/wifi_remote_over_eppp
-      registry_url: https://components.espressif.com
-      require: private
-      version: '>=0.1'
+      version: '>=0.0.6'
     - name: idf
       require: private
       version: '>=5.3'
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.6.5
+    version: 0.14.5
   espressif/freetype:
     component_hash: f31808b6826df6aa58713e7fc7bcdafaa9c28fab47d2b9e9684dac6d89e3aea3
     dependencies:
@@ -382,20 +340,6 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 0.20260529.0
-  espressif/wifi_remote_over_eppp:
-    component_hash: 1fd6968af20f0b19e421f6b519b0a8caf81d689afc3783b564c28559e45f66ef
-    dependencies:
-    - name: espressif/eppp_link
-      registry_url: https://components.espressif.com
-      require: private
-      version: '>=0.1'
-    - name: idf
-      require: private
-      version: '>=5.3'
-    source:
-      registry_url: https://components.espressif.com
-      type: service
-    version: 0.3.3
   espressif/zlib:
     component_hash: 93685dbbacd6fd620b2b7bcbfac628c4f1289e64f7a68fc7604e43dec517595e
     dependencies:
@@ -480,12 +424,13 @@ dependencies:
     - esp32p4
     version: 2.0.0
 direct_dependencies:
+- espressif/esp_hosted
 - espressif/esp_websocket_client
 - espressif/esp_wifi_remote
 - espressif/mdns
 - idf
 - lvgl/lvgl
 - waveshare/esp32_p4_wifi6_touch_lcd_x
-manifest_hash: 6584b77fc2e9abc8954b0387c0fc2c6fcac4f94161e50e21dfc5869194dbc23a
+manifest_hash: 123834cde8e5fc74bdcc9634e4751f562cbfbb0db11afc831b0b8195e20bdd3b
 target: esp32p4
 version: 2.0.0

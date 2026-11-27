@@ -4,7 +4,10 @@ dependencies:
   # Display (JD9365, MIPI-DSI), GT911 touch, backlight and the LVGL adapter.
   waveshare/esp32_p4_wifi6_touch_lcd_x: "^2.0.3"
   # Wi-Fi through the ESP32-C6 co-processor (SDIO): the esp_wifi API, served by the C6.
-  # esp_wifi_remote brings esp_hosted on the ESP32-P4.
-  espressif/esp_wifi_remote: "^1.6"
+  # The same versions as Waveshare's own examples for ESP-IDF 5.x: they match the co-processor
+  # firmware the boards ship with. esp_hosted 3.x speaks a newer protocol to that firmware: Wi-Fi
+  # scans time out and SDIO frames get dropped.
+  espressif/esp_wifi_remote: "0.14.*"
+  espressif/esp_hosted: "1.4.*"
   # Finding Music Assistant (_mass._tcp) on the network.
   espressif/mdns: "^1.15"
