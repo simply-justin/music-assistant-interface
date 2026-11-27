@@ -416,6 +416,17 @@ esp_http_client_config_t update_http() {
     return http;
 }
 
+// True when the server answers 404: no release has been published yet (a release answers with a
+// redirect to its CDN, which open() does not follow).
+bool nothing_published(const esp_http_client_config_t& http) {
+    esp_http_client_handle_t c = esp_http_client_init(&http);
+    if (!c) return false;
+    bool missing = esp_http_client_open(c, 0) == ESP_OK && esp_http_client_fetch_headers(c) >= 0 &&
+                   esp_http_client_get_status_code(c) == 404;
+    esp_http_client_cleanup(c);
+    return missing;
+}
+
 // Blocking work on a short-lived task; `fn` gets the Post to report back on the core task.
 void run_task(const char* name, Post post, std::function<void(Post&)> fn) {
     struct Job {
@@ -451,6 +462,8 @@ void BoardPlatform::update_check(std::function<void(std::string, bool)> done) {
             esp_app_desc_t desc{};
             if (esp_https_ota_get_img_desc(h, &desc) == ESP_OK) version = desc.version;
             esp_https_ota_abort(h);
+        } else if (nothing_published(http)) {
+            version = esp_app_get_description()->version;  // no release yet: nothing newer than this one
         }
         ESP_LOGI(TAG, "update check: %s", version.empty() ? "nothing readable" : version.c_str());
         post([done, version] { done(version, true); });
