@@ -164,7 +164,17 @@ void MockBackend::request(Request req, Done done) {
     });
 }
 
+void MockBackend::set_player_state(const std::string& player_id, const std::string& state) {
+    const cJSON* p;
+    cJSON_ArrayForEach(p, players_.get()) {
+        if (json_str(p, "player_id") != player_id) continue;
+        cJSON_ReplaceItemInObject(const_cast<cJSON*>(p), "playback_state", cJSON_CreateString(state.c_str()));
+        emit("player_updated", player_id, Json(cJSON_Duplicate(p, true)));
+    }
+}
+
 Response MockBackend::handle(const Request& req) {
+    received.push_back(req.command);
     const cJSON* args = req.args.get();
     Response r;
     r.ok = true;

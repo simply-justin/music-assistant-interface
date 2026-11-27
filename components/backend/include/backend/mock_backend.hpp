@@ -3,6 +3,8 @@
 // sources, realistic latency, and library results arriving before the full search.
 #include <deque>
 #include <functional>
+#include <string>
+#include <vector>
 
 #include "backend/backend.hpp"
 
@@ -26,6 +28,10 @@ public:
     void reconnect() override { start(); }
     // Starts unconfigured (first-time setup) instead of connected.
     void set_unconfigured() { url_.clear(); }
+    // Test hooks: every command received, in order; change a player's playback state (sends
+    // player_updated like the server).
+    std::vector<std::string> received;
+    void set_player_state(const std::string& player_id, const std::string& state);
 
 private:
     struct Delivery {

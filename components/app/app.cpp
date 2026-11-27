@@ -8,10 +8,17 @@ namespace app {
 
 void Context::send(backend::Request req, std::function<void(backend::Response&&)> on_ok) {
     std::string command = req.command;
-    backend.request(std::move(req), [this, command, on_ok = std::move(on_ok)](backend::Response&& r) {
+    std::string args;  // for the log: which item the server refused to play
+    if (command == "player_queues/play_media" && req.args) {
+        char* text = cJSON_PrintUnformatted(req.args.get());
+        if (text) args = text;
+        cJSON_free(text);
+    }
+    backend.request(std::move(req), [this, command, args, on_ok = std::move(on_ok)](backend::Response&& r) {
         if (!r.ok) {
             // The toast is generic; the log says what the server answered (serial log on the panel).
-            std::printf("command %s failed: %s %s\n", command.c_str(), r.error_code.c_str(), r.details.c_str());
+            std::printf("command %s failed: %s %s %s\n", command.c_str(), r.error_code.c_str(), r.details.c_str(),
+                        args.c_str());
             if (r.error_code != "disconnected")
                 publish(Toast{i18n::tr(i18n::Str::toast_command_failed), std::nullopt, {}, true});
             return;  // disconnects are shown by the connection banner instead

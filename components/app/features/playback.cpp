@@ -15,8 +15,12 @@ public:
         if (q.empty()) return;
         if (auto* p = std::get_if<cmd::Play>(&c)) {
             // Only the shown source is played, never every merged duplicate.
-            if (guard_.allow("play|" + p->item.uri, ctx_.now_ms))
+            if (guard_.allow("play|" + p->item.uri, ctx_.now_ms)) {
+                // On a paused queue MA resumes the paused song for a moment before switching:
+                // stop it first. Playing already: no extra round trip.
+                if (ctx_.player_paused) ctx_.send(ma::cmd::stop(q));
                 ctx_.send(ma::cmd::play_media(q, {p->item.uri}, ma::cmd::PlayOption::Play));
+            }
         } else if (std::holds_alternative<cmd::PlayPause>(c)) {
             if (guard_.allow("play_pause", ctx_.now_ms)) ctx_.send(ma::cmd::play_pause(q));
         } else if (std::holds_alternative<cmd::Next>(c)) {

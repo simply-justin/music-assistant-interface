@@ -1,5 +1,6 @@
 // Integration tests: the whole core (App + every feature) against the mock server and the
 // fake platform, driven by commands the UI sends, checked on the updates the UI receives.
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -376,6 +377,27 @@ TEST(unreachable_server_does_not_block_commands) {
     p.send(app::cmd::SetVolume{"living", 50});  // must neither crash nor hang
     p.send(app::cmd::Search{"viva"});
     CHECK(true);
+}
+
+TEST(playing_on_a_paused_speaker_stops_the_old_song_first) {
+    Panel p;
+    MediaItem song;
+    song.type = MediaType::Track;
+    song.name = "Yellow";
+    song.uri = "spotify://track/7";
+    // Playing: one round trip, no stop.
+    p.mock.received.clear();
+    p.send(app::cmd::Play{song});
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "player_queues/stop") == 0);
+    // Paused: MA would resume the old song for a moment; stop it, then play.
+    p.mock.set_player_state("living", "paused");
+    p.run(100);
+    p.mock.received.clear();
+    song.uri = "spotify://track/8";  // a different song (the double-tap guard ignores repeats)
+    p.send(app::cmd::Play{song});
+    auto stop = std::find(p.mock.received.begin(), p.mock.received.end(), "player_queues/stop");
+    auto play = std::find(p.mock.received.begin(), p.mock.received.end(), "player_queues/play_media");
+    CHECK(stop != p.mock.received.end() && play != p.mock.received.end() && stop < play);
 }
 
 int main() { return check::run_all("integration"); }

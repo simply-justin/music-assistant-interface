@@ -19,6 +19,7 @@ backend::Request library_items(core::MediaType type, bool favorite_only, int lim
                                const char* order_by = "sort_name");
 backend::Request play_media(const std::string& queue_id, const std::vector<std::string>& uris, PlayOption option);
 backend::Request play_pause(const std::string& queue_id);
+backend::Request stop(const std::string& queue_id);
 backend::Request next(const std::string& queue_id);
 backend::Request previous(const std::string& queue_id);
 backend::Request seek(const std::string& queue_id, int position_s);

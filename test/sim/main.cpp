@@ -171,6 +171,19 @@ int main(int argc, char** argv) {
     shot("02_now_playing");
     ui::open(ui::ScreenId::Search);
     shot("03_search_keyboard");
+    {  // long query: the field must show its end, not clip it
+        std::function<lv_obj_t*(lv_obj_t*)> ta = [&](lv_obj_t* o) -> lv_obj_t* {
+            if (lv_obj_check_type(o, &lv_textarea_class) && !lv_obj_has_flag(o, LV_OBJ_FLAG_HIDDEN)) return o;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(o); ++i)
+                if (lv_obj_t* f = ta(lv_obj_get_child(o, static_cast<int32_t>(i)))) return f;
+            return nullptr;
+        };
+        if (lv_obj_t* t = ta(lv_screen_active())) {
+            lv_textarea_set_text(t, "the quick brown fox jumps over the lazy dog bohemian rhapsody queen");
+            shot("03b_search_long_query");
+            lv_textarea_set_text(t, "");
+        }
+    }
     core.handle(app::cmd::Search{"viva"});
     run(1200);
     shot("04_search_results");

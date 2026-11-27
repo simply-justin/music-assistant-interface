@@ -77,6 +77,7 @@ Request play_media(const std::string& queue_id, const std::vector<std::string>& 
 }
 
 Request play_pause(const std::string& q) { return on_queue("player_queues/play_pause", q); }
+Request stop(const std::string& q) { return on_queue("player_queues/stop", q); }
 Request next(const std::string& q) { return on_queue("player_queues/next", q); }
 Request previous(const std::string& q) { return on_queue("player_queues/previous", q); }
 

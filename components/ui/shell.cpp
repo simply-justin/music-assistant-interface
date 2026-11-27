@@ -351,6 +351,11 @@ std::string signature(const core::QueueState& q) {
 void tick_progress(lv_timer_t*) {
     auto& s = shell();
     tick_ambient();
+    if (s.state.pending && lv_tick_elaps(s.state.pending_at_ms) >= State::kPendingMs) {
+        s.state.pending.reset();  // never confirmed (the server refused it): show the real queue again
+        refresh_bar();
+    }
+    if (s.state.pending) return;  // don't run the clock before the song has started
     if (!s.state.playing()) return;
     ++s.state.elapsed_s;
     screen(s.current).refresh(Topic::Progress);
@@ -370,6 +375,7 @@ const core::PlayerState* State::selected() const {
 }
 
 std::optional<core::MediaItem> State::now_playing() const {
+    if (pending && lv_tick_elaps(pending_at_ms) < kPendingMs) return pending;
     if (queue && queue->current && queue->current->media) return queue->current->media;
     if (queue && queue->current_index >= 0 && static_cast<size_t>(queue->current_index) < queue->items.size() &&
         queue->items[queue->current_index].media)
@@ -378,6 +384,7 @@ std::optional<core::MediaItem> State::now_playing() const {
 }
 
 bool State::playing() const {
+    if (pending && lv_tick_elaps(pending_at_ms) < kPendingMs) return true;
     const core::PlayerState* p = selected();
     return p && p->state == core::PlaybackState::Playing;
 }
@@ -632,7 +639,18 @@ void open_detail(const core::MediaItem& item) {
     open(ScreenId::Detail);
 }
 
-void play(const core::MediaItem& item) { send(app::cmd::Play{item}); }
+void play(const core::MediaItem& item) {
+    // Songs and stations show in the player bar at once; albums and playlists wait for the queue
+    // (the bar would otherwise show the album's name as if it were a song).
+    if (item.type == core::MediaType::Track || item.type == core::MediaType::Radio) {
+        auto& s = shell();
+        s.state.pending = item;
+        s.state.pending_at_ms = lv_tick_get();
+        s.state.elapsed_s = 0;
+        refresh_bar();
+    }
+    send(app::cmd::Play{item});
+}
 
 std::string songs(size_t count) {
     return i18n::tr(count == 1 ? i18n::Str::count_song : i18n::Str::count_songs, std::to_string(count));
@@ -712,6 +730,10 @@ void apply(app::Update update) {
     } else if (auto* q = std::get_if<std::shared_ptr<const core::QueueState>>(&update)) {
         bool same = s.state.queue && signature(**q) == signature(*s.state.queue);
         s.state.queue = *q;
+        if (s.state.pending) {  // the tapped song is now the queue's current one: stop pretending
+            const auto& cur = (*q)->current;
+            if (cur && cur->media && cur->media->uri == s.state.pending->uri) s.state.pending.reset();
+        }
         s.state.elapsed_s = (*q)->elapsed_s;
         if (same) {  // only the time moved: no rebuild (it reset scroll and re-faded every cover)
             screen(s.current).refresh(Topic::Progress);

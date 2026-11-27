@@ -78,7 +78,11 @@ private:
         }
     }
 
-    void publish() { ctx_.publish(std::make_shared<const PlayersView>(view_)); }
+    void publish() {
+        auto it = find(view_.selected_id);
+        ctx_.player_paused = it != view_.players.end() && it->state == core::PlaybackState::Paused;
+        ctx_.publish(std::make_shared<const PlayersView>(view_));
+    }
 
     Context& ctx_;
     PlayersView view_;

@@ -26,9 +26,14 @@ struct State {
     std::shared_ptr<const app::PanelView> panel;
     bool ever_connected = false;
     uint32_t elapsed_s = 0;  // local 1 Hz clock, re-synced from the queue
+    // A song just tapped: shown as playing right away, until the queue confirms it (the server and
+    // speaker take ~3 s) or kPendingMs passes.
+    std::optional<core::MediaItem> pending;
+    uint32_t pending_at_ms = 0;
+    static constexpr uint32_t kPendingMs = 8000;
 
     const core::PlayerState* selected() const;
-    std::optional<core::MediaItem> now_playing() const;  // current queue item's media
+    std::optional<core::MediaItem> now_playing() const;  // the tapped song, else the queue's current one
     bool playing() const;
     bool connected() const { return connection.state == backend::Connection::Connected; }
     const app::BrowseView* list(app::cmd::BrowseKind kind, const std::string& of_uri = "") const;

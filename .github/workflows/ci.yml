@@ -49,7 +49,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: test/sim/build/_deps
-          key: lvgl-v9.3.0-${{ runner.os }}
+          key: lvgl-v9.5.0-${{ runner.os }}
       - name: Configure
         run: cmake -S test/sim -B test/sim/build -DCJSON_DIR="$RUNNER_TEMP/cjson" -DPANEL_SANITIZE=ON
       - name: Build

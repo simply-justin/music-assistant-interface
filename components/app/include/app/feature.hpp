@@ -26,6 +26,7 @@ struct Context {
     uint32_t now_ms = 0;
     std::string player_id;  // selected player
     std::string queue_id;   // its active queue: its own, or its group's when grouped
+    bool player_paused = false;  // the selected player is paused (kept by the players feature)
     core::SourcePrefs prefs;
 
     // Sends a request; on failure shows a generic "didn't work" toast.

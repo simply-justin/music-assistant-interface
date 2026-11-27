@@ -309,10 +309,44 @@ TEST(search_by_typing_merges_duplicates) {
     tap("Home");
 }
 
+// Search: the action key hides the keyboard so the results are visible; tapping the field brings
+// it back. Pressed with the finger on the real key (not the shortcut that fires the key event).
+TEST(search_key_hides_keyboard_and_field_brings_it_back) {
+    CHECK(tap("Search"));
+    lv_obj_t* input = find_type(&lv_textarea_class);
+    CHECK(input);
+    if (!input) return;
+    press_at(center(input), 80);  // with text from an earlier search the keyboard starts hidden
+    g_panel->run(300);
+    lv_obj_t* kb = find_type(&lv_buttonmatrix_class);
+    CHECK(kb);
+    if (!kb) return;
+    type("a");
+    lv_area_t a = area(kb);
+    int32_t row_h = (lv_area_get_height(&a) - 32 - 3 * 10) / 4;
+    press_at({a.x2 - 80, a.y1 + 16 + row_h + 10 + row_h / 2}, 80);  // the action key, end of row 2
+    g_panel->run(400);
+    CHECK(!find_type(&lv_buttonmatrix_class));  // hidden
+    lv_obj_t* field = find_type(&lv_textarea_class);
+    CHECK(field);
+    if (field) press_at(center(field), 80);
+    g_panel->run(300);
+    CHECK(find_type(&lv_buttonmatrix_class));  // back
+    tap("Home");
+}
+
 TEST(tapping_a_favourite_plays_it) {
     ui::open(ui::ScreenId::Home);
     g_panel->run(300);
     CHECK(tap("Radio Paradise"));  // the favourite tile (it comes before the stations row)
+    // Shown in the player bar at once, before the server answers.
+    int at_once = 0;
+    walk(lv_screen_active(), [&](lv_obj_t* o) {
+        if (lv_obj_check_type(o, &lv_label_class) && on_screen(o) && std::string(lv_label_get_text(o)) == "Radio Paradise" &&
+            area(o).y1 >= H - 96)
+            ++at_once;
+    });
+    CHECK(at_once == 1);
     g_panel->run(800);
     // Play replaces the queue with what was tapped, and the player bar shows it.
     CHECK(g_panel->queue && g_panel->queue->items.size() == 1 && g_panel->queue->items[0].name == "Radio Paradise");

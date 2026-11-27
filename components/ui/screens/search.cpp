@@ -28,7 +28,10 @@ public:
         lv_obj_remove_style_all(input_);
         lv_textarea_set_one_line(input_, true);
         lv_textarea_set_placeholder_text(input_, tr(i18n::Str::search_placeholder));
+        lv_obj_set_width(input_, 1);  // grows into the row; never wider than the space before ×
         lv_obj_set_flex_grow(input_, 1);
+        lv_obj_set_style_pad_right(input_, 12, 0);  // room for the cursor after the last letter (it was clipped)
+        lv_obj_set_style_pad_ver(input_, 4, 0);     // descenders (g, y, p) stay inside the field
         lv_obj_set_style_text_font(input_, theme::body(), 0);
         lv_obj_set_style_text_color(input_, theme::field_text(), 0);
         lv_obj_set_style_text_color(input_, lv_color_hex(0x6B6B6B), LV_PART_TEXTAREA_PLACEHOLDER);
@@ -52,6 +55,10 @@ public:
         lv_obj_set_width(results_, lv_pct(100));
         lv_obj_set_flex_grow(results_, 1);
         lv_obj_set_style_pad_bottom(results_, 24, 0);
+        // Touching or scrolling the results puts the keyboard away (the field brings it back).
+        auto hide = [](lv_event_t* e) { static_cast<Search*>(lv_event_get_user_data(e))->show_keyboard(false); };
+        lv_obj_add_event_cb(results_, hide, LV_EVENT_PRESSED, this);
+        lv_obj_add_event_cb(results_, hide, LV_EVENT_SCROLL_BEGIN, this);
         build_keyboard(root);
     }
 
