@@ -3,6 +3,8 @@
 // docs/architecture.md, Known limitations).
 #include "board.hpp"
 
+#include "board_cp.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <ctime>
@@ -221,6 +223,7 @@ BoardPlatform::BoardPlatform(Post post) : s_(std::make_unique<State>()) {
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_ip, s_.get(), nullptr));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
+    update_coprocessor_if_needed();  // the C6 must run the same ESP-Hosted version for Wi-Fi to work
 
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&sntp);

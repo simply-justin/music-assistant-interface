@@ -51,7 +51,7 @@ jobs:
           path: test/sim/build/_deps
           key: lvgl-v9.3.0-${{ runner.os }}
       - name: Configure
-        run: cmake -S test/sim -B test/sim/build -DCJSON_DIR="$RUNNER_TEMP/cjson"
+        run: cmake -S test/sim -B test/sim/build -DCJSON_DIR="$RUNNER_TEMP/cjson" -DPANEL_SANITIZE=ON
       - name: Build
         run: cmake --build test/sim/build -j
       - name: End-to-end tests

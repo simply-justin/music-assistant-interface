@@ -121,6 +121,9 @@ void drain_updates(lv_timer_t*) {
 void start_ui() {
     bsp_display_cfg_t cfg{};
     cfg.lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
+    // The UI is built and rebuilt on the LVGL task (screens, the QR code, text layout): the default
+    // 8 KB overflowed on the sign-in screen. Internal RAM, for speed.
+    cfg.lv_adapter_cfg.task_stack_size = 32 * 1024;
     // The 10.1" panel is 800×1280 portrait: rotate to 1280×800 landscape; menuconfig picks 90° or
     // 270° to match how the panel hangs (270° is upright on the Waveshare board).
     // The adapter rotates the image in hardware (LVGL itself stays at 0°), so touch arrives in the

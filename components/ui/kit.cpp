@@ -675,7 +675,13 @@ lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& done, c
             if (k->layer == Layer::Upper) show_layer(kb, k, Layer::Lower);  // one capital, then back
         }
     }, LV_EVENT_VALUE_CHANGED, k);
-    lv_obj_add_event_cb(kb, [](lv_event_t* e) { delete static_cast<Keys*>(lv_event_get_user_data(e)); }, LV_EVENT_DELETE, k);
+    lv_obj_add_event_cb(kb, [](lv_event_t* e) {
+        // LVGL still restyles a key that was being pressed after this DELETE event (it clears the
+        // pressed state), which re-reads the map: point it at a static one before freeing ours.
+        static const char* const kEmpty[] = {""};
+        lv_buttonmatrix_set_map(static_cast<lv_obj_t*>(lv_event_get_target(e)), kEmpty);
+        delete static_cast<Keys*>(lv_event_get_user_data(e));
+    }, LV_EVENT_DELETE, k);
     return kb;
 }
 

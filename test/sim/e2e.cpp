@@ -359,6 +359,28 @@ TEST(language_switch_applies_instantly) {
     tap("Home");
 }
 
+// A key held down while the screen replaces the keyboard (Join → the step changes) must not read
+// the freed key map: crashed the panel on the device. Run under ASan in CI.
+TEST(setup_keyboard_replaced_under_a_finger) {
+    CHECK(tap("Get started"));
+    g_panel->run(1200);
+    CHECK(tap("HomeNetwork"));
+    lv_obj_t* kb = find_type(&lv_buttonmatrix_class);
+    CHECK(kb);
+    if (!kb) return;
+    lv_area_t a = area(kb);
+    g_finger.at = {a.x1 + 40, a.y1 + 40};  // on the "q" key
+    g_finger.down = true;
+    g_panel->run(100);
+    g_panel->core->handle(app::cmd::SetupGo{app::SetupStep::Wifi});  // the step changes under the finger
+    g_panel->run(200);
+    g_finger.down = false;
+    g_panel->run(200);
+    CHECK(find_text("Connect to Wi-Fi"));
+    CHECK(tap("Back"));  // back to the start for the next scenario
+    g_panel->run(300);
+}
+
 TEST(setup_first_time_reaches_home) {
     // A fresh panel: no server, no token. The fake phone sends the token after 3 s.
     CHECK(tap("Get started"));
