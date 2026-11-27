@@ -35,9 +35,28 @@ public:
         } else if (auto* n = std::get_if<cmd::CreatePlaylist>(&c)) {
             create(*n);
         } else if (auto* r = std::get_if<cmd::RemoveFromPlaylist>(&c)) {
+            // Positions shift with every removal, and the list on screen only catches up after the
+            // refresh: one at a time, or a second quick × would hit the song below the one tapped.
+            if (removing_) return;
+            removing_ = true;
             auto playlist = r->playlist;
-            ctx_.send(ma::cmd::playlist_remove_tracks(playlist.item_id, {r->position}), [this, playlist](backend::Response&&) {
-                ctx_.dispatch(cmd::Browse{cmd::BrowseKind::PlaylistTracks, playlist});
+            ctx_.backend.request(ma::cmd::playlist_remove_tracks(playlist.item_id, {r->position}),
+                                 [this, playlist](backend::Response&& res) {
+                if (!res.ok) {
+                    removing_ = false;
+                    ctx_.publish(Toast{i18n::tr(i18n::Str::toast_command_failed), std::nullopt, {}, true});
+                    return;
+                }
+                ctx_.backend.request(ma::cmd::playlist_tracks(playlist), [this, playlist](backend::Response&& list) {
+                    removing_ = false;
+                    if (!list.ok) return;
+                    auto view = std::make_shared<BrowseView>();
+                    view->kind = cmd::BrowseKind::PlaylistTracks;
+                    view->of_uri = playlist.uri;
+                    view->loading = false;
+                    view->items = ma::parse::media_items(list.result.get());
+                    ctx_.publish(std::shared_ptr<const BrowseView>(view));
+                });
             });
         } else if (auto* d = std::get_if<cmd::DeletePlaylist>(&c)) {
             ctx_.send(ma::cmd::playlist_delete(d->playlist.item_id), [this](backend::Response&&) {
@@ -70,6 +89,7 @@ private:
     Context& ctx_;
     PlaylistsView view_;
     core::RepeatGuard guard_;
+    bool removing_ = false;  // a removal and its refresh are in flight
 };
 
 }  // namespace

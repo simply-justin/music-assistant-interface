@@ -32,6 +32,13 @@ menu "Music panel"
             bool "Landscape, rotated 270 degrees"
     endchoice
 
+    config PANEL_UPDATE_URL
+        string "Firmware update URL"
+        default "https://github.com/simply-justin/music-assistant-interface/releases/latest/download/music_panel.bin"
+        help
+            Settings › About › Check for updates reads the newest firmware here (HTTPS). The
+            release workflow publishes music_panel.bin with every version tag.
+
     config PANEL_TIMEZONE
         string "Time zone (POSIX TZ)"
         default "CET-1CEST,M3.5.0,M10.5.0/3"

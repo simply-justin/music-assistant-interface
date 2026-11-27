@@ -26,6 +26,7 @@ public:
     void request(backend::Request req, Done done) override { session_.request(std::move(req), std::move(done)); }
     void configure(const std::string& url, const std::string& token) override;
     void reconnect() override;
+    void tick(uint32_t now_ms) override { session_.tick(now_ms); }
 
 private:
     static void on_ws_event(void* arg, const char* base, int32_t id, void* data);

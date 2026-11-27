@@ -21,7 +21,14 @@ public:
         lv_obj_set_style_pad_bottom(root, 24, 0);  // room under the last row when the page scrolls
     }
 
+    // Home is opened often (every tab switch): reload only after a (re)connect or when the lists are
+    // a few minutes old. Favourites changed on this panel are refreshed by the core right away.
     void on_open() override {
+        bool fresh = loaded_epoch_ == state().connected_epoch && lv_tick_elaps(loaded_at_) < kReloadMs &&
+                     state().list(Kind::Favourites);
+        if (fresh) return;
+        loaded_epoch_ = state().connected_epoch;
+        loaded_at_ = lv_tick_get();
         send(app::cmd::Browse{Kind::Favourites, {}});
         send(app::cmd::Browse{Kind::RecentlyPlayed, {}});
         send(app::cmd::Browse{Kind::LibraryRadio, {}});
@@ -31,7 +38,7 @@ public:
         // Home shows lists, favourites and the connection, not the speakers or the queue (the
         // player bar does): skip those, so playback changes don't rebuild the page under a finger.
         if (t == Topic::Progress || t == Topic::Search || t == Topic::Setup || t == Topic::Players || t == Topic::Queue ||
-            t == Topic::Panel)
+            t == Topic::Panel || t == Topic::Sleep || t == Topic::Update)
             return;
         rebuild();
     }
@@ -154,6 +161,8 @@ private:
     static constexpr size_t kPerRow = 6;
     lv_obj_t* root_ = nullptr;
     Filter filter_ = Filter::All;
+    static constexpr uint32_t kReloadMs = 120'000;
+    uint32_t loaded_epoch_ = UINT32_MAX, loaded_at_ = 0;
 };
 
 }  // namespace

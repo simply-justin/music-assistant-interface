@@ -55,6 +55,16 @@ public:
         return lt->tm_hour * 60 + lt->tm_min;
     }
     void restart() override { restarted = true; }
+    // Updates: `published` is the newest version online ("" = no internet); installing takes 2 s.
+    std::string published = "v9.9.9";
+    void update_check(std::function<void(std::string, bool)> done) override {
+        std::string v = published;
+        later(500, [v, done] { done(v, !v.empty()); });
+    }
+    void update_install(std::function<void(int)> progress, std::function<void(bool)> done) override {
+        for (int p = 25; p <= 100; p += 25) later(static_cast<uint32_t>(p) * 20, [progress, p] { progress(p); });
+        later(2100, [done] { done(true); });
+    }
     bool restarted = false;
     std::string last_pairing_server;
 

@@ -63,7 +63,9 @@ public:
     }
 
     void refresh(Topic t) override {
-        if (t == Topic::Progress || t == Topic::Search || t == Topic::Browse || t == Topic::Queue || t == Topic::Playlists) return;
+        if (t == Topic::Progress || t == Topic::Search || t == Topic::Browse || t == Topic::Queue || t == Topic::Playlists ||
+            t == Topic::Sleep)
+            return;
         if (t == Topic::Panel && dragging_) return;  // don't rebuild under a finger dragging a slider
         lv_obj_clean(root_);
         nav();
@@ -381,6 +383,28 @@ private:
             value_row(g, tr(i18n::Str::about_memory),
                       i18n::tr(i18n::Str::about_memory_value, std::to_string(pv->system.free_internal_kb) + " KB · PSRAM " +
                                                                   std::to_string(pv->system.free_psram_kb / 1024) + " MB"));
+        }
+
+        // Software update: one row whose text and action follow the update state.
+        g = group(pane, tr(i18n::Str::ota_title));
+        const app::UpdateView& u = state().update;
+        switch (u.state) {
+            case app::UpdateState::Checking: value_row(g, tr(i18n::Str::ota_checking), ""); break;
+            case app::UpdateState::Installing:
+                value_row(g, i18n::tr(i18n::Str::ota_installing, std::to_string(u.percent)), u.version);
+                break;
+            case app::UpdateState::Available:
+                value_row(g, i18n::tr(i18n::Str::ota_available, u.version), "");
+                action_row(g, icon::refresh, tr(i18n::Str::ota_install), [] { send(app::cmd::InstallUpdate{}); });
+                break;
+            default: {
+                i18n::Str note = u.state == app::UpdateState::UpToDate  ? i18n::Str::ota_up_to_date
+                               : u.state == app::UpdateState::Failed    ? i18n::Str::ota_failed
+                               : u.state == app::UpdateState::NoNetwork ? i18n::Str::ota_no_network
+                                                                        : i18n::Str::ota_check;
+                if (u.state != app::UpdateState::Idle) value_row(g, tr(note), "");
+                action_row(g, icon::refresh, tr(i18n::Str::ota_check), [] { send(app::cmd::CheckUpdate{}); });
+            }
         }
 
         g = group(pane, tr(i18n::Str::about_diagnostics));

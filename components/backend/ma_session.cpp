@@ -1,5 +1,7 @@
 #include "backend/ma_session.hpp"
 
+#include <vector>
+
 using namespace backend;
 
 namespace ma {
@@ -56,7 +58,25 @@ void Session::send_now(Request req, Backend::Done done) {
         if (done) done(std::move(r));
         return;
     }
-    pending_[id] = Pending{std::move(done), nullptr};
+    pending_[id] = Pending{std::move(done), nullptr, now_ms_};
+}
+
+void Session::tick(uint32_t now_ms) {
+    now_ms_ = now_ms;
+    std::vector<Backend::Done> expired;
+    for (auto it = pending_.begin(); it != pending_.end();) {
+        if (now_ms - it->second.sent_ms >= kTimeoutMs) {
+            expired.push_back(std::move(it->second.done));
+            it = pending_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (auto& done : expired) {
+        Response r;
+        r.error_code = "timeout";
+        if (done) done(std::move(r));
+    }
 }
 
 void Session::on_open() {
@@ -131,6 +151,7 @@ void Session::on_response(const std::string& id, const cJSON* msg) {
     if (json_bool(msg, "partial")) {
         // Large lists arrive in chunks: join arrays until the final message.
         if (!p.partial) p.partial.reset(cJSON_CreateArray());
+        p.sent_ms = now_ms_;
         if (cJSON_IsArray(result)) {
             while (cJSON* item = cJSON_DetachItemFromArray(result, 0)) cJSON_AddItemToArray(p.partial.get(), item);
         }

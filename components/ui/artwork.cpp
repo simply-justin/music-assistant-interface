@@ -13,7 +13,11 @@ struct Art {
     ArtLoader loader;
     img::Cache cache{16u << 20};
     std::string base;
-    std::map<std::string, std::vector<std::function<void(std::shared_ptr<img::Bitmap>)>>> pending;
+    struct Waiting {
+        std::vector<std::function<void(std::shared_ptr<img::Bitmap>)>> callbacks;
+        std::shared_ptr<std::atomic<int>> wanted = std::make_shared<std::atomic<int>>(0);
+    };
+    std::map<std::string, Waiting> pending;
 };
 
 Art& art_state() {
@@ -74,12 +78,19 @@ void attach(lv_obj_t* box, const core::MediaItem& item, int w, int h, int radius
         if (on_ready) on_ready(hit->average);
         return;
     }
-    // The box may be gone by the time the image arrives.
-    auto* alive = new std::shared_ptr<bool>(std::make_shared<bool>(true));
-    auto flag = *alive;
+    // The box may be gone by the time the image arrives; then it also stops counting as wanted.
+    auto& waiting = a.pending[key];
+    struct Alive {
+        std::shared_ptr<bool> flag;
+        std::shared_ptr<std::atomic<int>> wanted;
+    };
+    auto* alive = new Alive{std::make_shared<bool>(true), waiting.wanted};
+    ++*waiting.wanted;
+    auto flag = alive->flag;
     lv_obj_add_event_cb(box, [](lv_event_t* e) {
-        auto* p = static_cast<std::shared_ptr<bool>*>(lv_event_get_user_data(e));
-        **p = false;
+        auto* p = static_cast<Alive*>(lv_event_get_user_data(e));
+        *p->flag = false;
+        --*p->wanted;
         delete p;
     }, LV_EVENT_DELETE, alive);
     auto deliver = [box, key, flag, on_ready](std::shared_ptr<img::Bitmap> bmp) {
@@ -87,13 +98,12 @@ void attach(lv_obj_t* box, const core::MediaItem& item, int w, int h, int radius
         show(box, key, bmp, true);
         if (on_ready) on_ready(bmp->average);
     };
-    auto& waiting = a.pending[key];
-    waiting.push_back(deliver);
-    if (waiting.size() > 1) return;  // same image already on its way
-    a.loader(ArtRequest{url, w, h, radius, bg_rgb}, [key](std::shared_ptr<img::Bitmap> bmp) {
+    waiting.callbacks.push_back(deliver);
+    if (waiting.callbacks.size() > 1) return;  // same image already on its way
+    a.loader(ArtRequest{url, w, h, radius, bg_rgb, waiting.wanted}, [key](std::shared_ptr<img::Bitmap> bmp) {
         auto& st = art_state();
         if (bmp) st.cache.put(key, bmp);
-        auto callbacks = std::move(st.pending[key]);
+        auto callbacks = std::move(st.pending[key].callbacks);
         st.pending.erase(key);
         for (auto& cb : callbacks) cb(bmp);
     });

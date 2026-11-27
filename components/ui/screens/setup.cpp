@@ -283,7 +283,8 @@ private:
               [](std::string a) { send(app::cmd::SetupUseServer{a}); });
         if (v.checking) kit::text(c, i18n::tr(i18n::Str::setup_checking, v.address), theme::body(), theme::text2());
         if (v.server_error) {
-            lv_obj_t* e = kit::text(c, tr(i18n::Str::setup_server_error), theme::body(), theme::danger_text(), true);
+            lv_obj_t* e = kit::text(c, tr(v.server_too_old ? i18n::Str::setup_server_old : i18n::Str::setup_server_error),
+                                    theme::body(), theme::danger_text(), true);
             lv_obj_set_width(e, lv_pct(100));
         }
         footer(SetupStep::Wifi, {});
@@ -325,6 +326,7 @@ private:
         }
         if (v.checking) kit::text(col, tr(i18n::Str::setup_checking_token), theme::body(), theme::text2());
         else if (v.token_error) banner(col, tr(i18n::Str::setup_token_rejected), tr(i18n::Str::setup_token_rejected_body));
+        else if (v.token_no_answer) banner(col, tr(i18n::Str::setup_signin_no_answer), tr(i18n::Str::setup_no_server_hint));
         else if (phone) {
             lv_obj_t* w = kit::text(col, tr(i18n::Str::setup_waiting_token), theme::body(), theme::accent());
             lv_obj_set_style_pad_left(w, kRowPad, 0);

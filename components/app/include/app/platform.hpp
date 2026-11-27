@@ -1,7 +1,7 @@
 #pragma once
 // Panel services that differ between the board and the PC: Wi-Fi, finding the server, receiving
-// the token from a phone, backlight, system info. The board's implementation arrives with the
-// board package (Phase 2b); the simulator uses a fake. Callbacks must run on the core task.
+// the token from a phone, backlight, system info, firmware updates. The board implements them in
+// main/board.cpp; the simulator and tests use a fake. Callbacks must run on the core task.
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -50,6 +50,14 @@ public:
     virtual SystemInfo system_info() = 0;
     virtual int local_minutes() = 0;  // minutes since local midnight, for the night schedule
     virtual void restart() = 0;
+    // Firmware updates over the internet. Defaults: not available (simulator, tests).
+    // check: the newest published version, or "" when none could be read (`online` false: no internet).
+    virtual void update_check(std::function<void(std::string version, bool online)> done) { done("", false); }
+    // Downloads and switches to the newest version; restart() runs it. progress: 0–100.
+    virtual void update_install(std::function<void(int percent)> progress, std::function<void(bool ok)> done) {
+        (void)progress;
+        done(false);
+    }
 };
 
 }  // namespace app

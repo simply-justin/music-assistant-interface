@@ -8,7 +8,10 @@
 namespace app {
 namespace {
 
-constexpr int kMaxItems = 500;  // shortcut: one page; page through if real queues get longer
+constexpr int kPage = 500;        // items per request
+constexpr int kMaxItems = 5000;   // a queue longer than this is cut off (PSRAM: ~1 KB per item)
+constexpr uint32_t kRefreshDelayMs = 250;  // bursts of queue_items_updated (Clear up next) fetch once
+constexpr uint32_t kUndoWaitMs = 3000;     // longest wait for the added song to show in the queue
 
 class Queue : public Feature {
 public:
@@ -29,13 +32,13 @@ public:
         }
         if (ev.object_id != ctx_.queue_id) return;
         if (ev.name == "queue_items_updated") {
-            refresh();
+            refresh_at_ = ctx_.now_ms + kRefreshDelayMs;
         } else if (ev.name == "queue_updated" && ev.data) {
             ma::parse::queue_state(ev.data.get(), queue_);
             publish();
         } else if (ev.name == "queue_time_updated" && cJSON_IsNumber(ev.data.get())) {
             queue_.elapsed_s = static_cast<uint32_t>(ev.data->valuedouble);  // verify: data is the elapsed seconds
-            publish();
+            ctx_.publish(QueueTime{ctx_.queue_id, queue_.elapsed_s});
         }
     }
 
@@ -45,6 +48,8 @@ public:
         if (q.empty()) return;
         if (auto* a = std::get_if<cmd::AddToQueue>(&c)) {
             add(*a);
+        } else if (auto* t = std::get_if<cmd::TransferQueue>(&c)) {
+            ctx_.send(ma::cmd::transfer(t->from_player, t->to_player));  // a player's own queue has its id
         } else if (std::holds_alternative<cmd::ClearUpNext>(c)) {
             clear_up_next();
         } else if (auto* r = std::get_if<cmd::RemoveFromQueue>(&c)) {
@@ -78,24 +83,45 @@ private:
         }
         auto option = a.next ? ma::cmd::PlayOption::Next : ma::cmd::PlayOption::Add;
         std::string name = a.item.name, uri = a.item.uri, q = ctx_.queue_id;
-        ctx_.send(ma::cmd::play_media(q, {uri}, option), [this, name, uri, q](backend::Response&&) {
-            // Find the item just added (the newest with this uri) so the toast can offer Undo.
-            ctx_.send(ma::cmd::queue_items(q, kMaxItems, 0), [this, name, uri](backend::Response&& r) {
-                std::string id;
-                const cJSON* it;
-                cJSON_ArrayForEach(it, r.result.get()) {
-                    core::QueueItem qi = ma::parse::queue_item(it);
-                    if (qi.media && qi.media->uri == uri) id = qi.queue_item_id;  // last match = newest
-                }
-                Toast t{i18n::tr(i18n::Str::toast_added_to_queue, name), std::nullopt, {}, false};
-                if (!id.empty()) {
-                    t.action = Command{cmd::RemoveFromQueue{id}};
-                    t.action_label = i18n::tr(i18n::Str::toast_undo);
-                }
-                ctx_.publish(std::move(t));
-            });
+        size_t before = count(uri);
+        ctx_.send(ma::cmd::play_media(q, {uri}, option), [this, name, uri, before](backend::Response&&) {
+            // The toast offers Undo once the queue (refreshed by the server's event) shows the song.
+            undo_ = Undo{name, uri, before, ctx_.now_ms};
         });
     }
+
+    size_t count(const std::string& uri) const {
+        return static_cast<size_t>(std::count_if(queue_.items.begin(), queue_.items.end(),
+                                                 [&](const core::QueueItem& qi) { return qi.media && qi.media->uri == uri; }));
+    }
+
+    // "Added …" with Undo when the new item is in the queue; without it if it never showed up.
+    void settle_undo(bool give_up) {
+        if (!undo_) return;
+        std::string id;
+        if (count(undo_->uri) > undo_->before)
+            for (const auto& qi : queue_.items)
+                if (qi.media && qi.media->uri == undo_->uri) id = qi.queue_item_id;  // last match = newest
+        if (id.empty() && !give_up) return;
+        Toast t{i18n::tr(i18n::Str::toast_added_to_queue, undo_->name), std::nullopt, {}, false};
+        if (!id.empty()) {
+            t.action = Command{cmd::RemoveFromQueue{id}};
+            t.action_label = i18n::tr(i18n::Str::toast_undo);
+        }
+        undo_.reset();
+        ctx_.publish(std::move(t));
+    }
+
+public:
+    void tick() override {
+        if (refresh_at_ && static_cast<int32_t>(ctx_.now_ms - refresh_at_) >= 0) {
+            refresh_at_ = 0;
+            refresh();
+        }
+        if (undo_ && ctx_.now_ms - undo_->at_ms > kUndoWaitMs) settle_undo(true);
+    }
+
+private:
 
     // The selected player plays from its group's queue when grouped, else its own (same id).
     void resolve_queue() {
@@ -124,19 +150,40 @@ private:
 
     void refresh() {
         if (ctx_.queue_id.empty()) return;
-        std::string q = ctx_.queue_id;
-        ctx_.send(ma::cmd::queue_items(q, kMaxItems, 0), [this, q](backend::Response&& r) {
-            if (q != ctx_.queue_id) return;  // queue changed meanwhile
-            queue_.queue_id = q;
-            queue_.items.clear();
+        auto items = std::make_shared<std::vector<core::QueueItem>>();
+        fetch_page(ctx_.queue_id, items, ++generation_);
+    }
+
+    // Page by page until a short page; published once complete, so the UI never sees half a queue.
+    void fetch_page(const std::string& q, std::shared_ptr<std::vector<core::QueueItem>> items, uint32_t gen) {
+        int offset = static_cast<int>(items->size());
+        ctx_.send(ma::cmd::queue_items(q, kPage, offset), [this, q, items, gen](backend::Response&& r) {
+            if (q != ctx_.queue_id || gen != generation_) return;  // queue changed, or a newer refresh runs
+            int got = 0;
             const cJSON* it;
-            cJSON_ArrayForEach(it, r.result.get()) queue_.items.push_back(ma::parse::queue_item(it));
+            cJSON_ArrayForEach(it, r.result.get()) {
+                items->push_back(ma::parse::queue_item(it));
+                ++got;
+            }
+            if (got == kPage && items->size() < static_cast<size_t>(kMaxItems)) return fetch_page(q, items, gen);
+            queue_.queue_id = q;
+            queue_.items = std::move(*items);
             publish();
+            settle_undo(false);
         });
     }
 
     void publish() { ctx_.publish(std::make_shared<const core::QueueState>(queue_)); }
     std::string group_;  // grouping of our player at the last resolve
+
+    struct Undo {
+        std::string name, uri;
+        size_t before;   // copies of uri in the queue before adding
+        uint32_t at_ms;
+    };
+    std::optional<Undo> undo_;
+    uint32_t refresh_at_ = 0;  // debounced refresh due (0 = none)
+    uint32_t generation_ = 0;  // newest refresh; older pages are dropped
 
     Context& ctx_;
     core::QueueState queue_;

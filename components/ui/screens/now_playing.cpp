@@ -15,7 +15,10 @@ public:
     }
 
     void refresh(Topic t) override {
-        if (t == Topic::Progress || t == Topic::Search || t == Topic::Browse || t == Topic::Setup) return;
+        if (t == Topic::Progress || t == Topic::Search || t == Topic::Browse || t == Topic::Setup || t == Topic::Update) return;
+        // Speaker updates (any speaker's volume, state…) matter here only through the selected one's
+        // stream title (radio) and the song itself: skip the rest, a rebuild re-tints the whole page.
+        if (t == Topic::Players && players_key() == shown_key_) return;
         rebuild();
     }
 
@@ -24,7 +27,35 @@ public:
     std::string title() const override { return tr(i18n::Str::np_title); }
 
 private:
+    static void sleep_sheet() {
+        kit::close_sheets();
+        lv_obj_t* s = kit::sheet(560);
+        kit::text(s, tr(i18n::Str::sleep_title), theme::h2(), theme::text());
+        lv_obj_t* opts = kit::row(s, 12);
+        lv_obj_set_width(opts, lv_pct(100));
+        lv_obj_set_flex_flow(opts, LV_FLEX_FLOW_ROW_WRAP);
+        lv_obj_set_style_pad_row(opts, 12, 0);
+        int now = state().sleep_minutes;
+        kit::chip(opts, nullptr, tr(i18n::Str::sleep_off), now == 0, [] {
+            send(app::cmd::SetSleepTimer{0});
+            kit::close_sheets();
+        });
+        for (int m : {15, 30, 45, 60, 90}) {
+            kit::chip(opts, nullptr, i18n::tr(i18n::Str::sleep_minutes, std::to_string(m)), false, [m] {
+                send(app::cmd::SetSleepTimer{m});
+                kit::close_sheets();
+            });
+        }
+    }
+
+    static std::string players_key() {
+        auto item = state().now_playing();
+        const core::PlayerState* p = state().selected();
+        return (item ? item->uri : "") + '|' + (p ? p->player_id + '|' + p->media_title + '|' + p->media_artist : "");
+    }
+
     void rebuild() {
+        shown_key_ = players_key();
         lv_obj_clean(root_);
         auto item = state().now_playing();
         const core::PlayerState* p = state().selected();
@@ -35,6 +66,9 @@ private:
         kit::icon_button(header, icon::chevron_down, [] { back(); }, 56, 32);
         kit::spacer(header);
         // Speaker, shuffle, repeat and volume live in the player bar below: no second copy up here.
+        int sleep = state().sleep_minutes;
+        if (sleep > 0) kit::text(header, i18n::tr(i18n::Str::sleep_active, std::to_string(sleep)), theme::meta(), theme::text2());
+        kit::icon_button(header, icon::moon, [] { sleep_sheet(); }, 56, 28, false, sleep > 0 ? theme::accent() : theme::text());
         if (item) {
             auto it = *item;
             kit::icon_button(header, icon::more, [it] { open_track_menu(it); }, 56, 28);
@@ -85,8 +119,9 @@ private:
         std::string sub = radio && p && !p->media_title.empty() ? p->media_title + " · " + p->media_artist : kit::subtitle(*item);
         kit::text(col, sub, theme::meta(), theme::text2());
         auto it = *item;
-        kit::icon_button(titles, it.favorite ? icon::heart_filled : icon::heart,
-                         [it] { send(app::cmd::SetFavourite{it, !it.favorite}); }, 56, 28, false, theme::text());
+        bool fav = state().favourite(it);
+        kit::icon_button(titles, fav ? icon::heart_filled : icon::heart, [it, fav] { set_favourite(it, !fav); }, 56, 28, false,
+                         theme::text());
 
         // Right: up next.
         lv_obj_t* right = kit::column(body, 4);
@@ -126,6 +161,7 @@ private:
     static constexpr int32_t kArt = 512;
     static constexpr int32_t kRowInset = 8;  // media_row's own horizontal padding
     lv_obj_t* root_ = nullptr;
+    std::string shown_key_;  // players_key() at the last rebuild
 };
 
 }  // namespace

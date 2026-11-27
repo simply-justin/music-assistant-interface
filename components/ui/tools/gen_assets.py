@@ -44,7 +44,7 @@ ICONS = {
     "play_next": "fill:skip-forward", "lock": "lock", "eye": "eye", "refresh": "arrows-clockwise",
     "moon": "moon", "sun": "sun", "phone": "device-mobile", "chart": "chart-bar", "power": "power",
     "edit": "pencil-simple", "playlist_add": "list-plus", "artist": "user", "album": "vinyl-record", "language": "globe",
-    "backspace": "backspace", "shift": "arrow-fat-up", "shift_on": "fill:arrow-fat-up",
+    "backspace": "backspace", "shift": "arrow-fat-up", "shift_on": "fill:arrow-fat-up", "drag": "dots-six-vertical",
 }
 ICON_SIZES = [22, 28, 32, 48]
 FILL_BASE = 0xF8E0  # Fill glyphs are remapped here so they don't clash with Bold codepoints

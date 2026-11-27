@@ -65,7 +65,7 @@ TEST(test_app_with_mock) {
 
     // Clear up next: the current song (index 0 in the mock) stays, the rest goes.
     a.handle(app::cmd::ClearUpNext{});
-    run_until(3100);
+    run_until(3500);
     {
         std::shared_ptr<const core::QueueState> cq;
         for (auto& u : updates)
@@ -80,7 +80,7 @@ TEST(test_app_with_mock) {
     fresh.uri = "library://track/t5";
     updates.clear();
     a.handle(app::cmd::AddToQueue{fresh});
-    run_until(3250);
+    run_until(4000);
     const app::Toast* undo = nullptr;
     for (auto& u : updates)
         if (auto* t = std::get_if<app::Toast>(&u)) undo = t;
@@ -90,33 +90,33 @@ TEST(test_app_with_mock) {
         if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
     size_t before = q ? q->items.size() : 0;
     if (undo) a.handle(*undo->action);
-    run_until(3400);
+    run_until(4500);
     for (auto& u : updates)
         if (auto* x = std::get_if<std::shared_ptr<const core::QueueState>>(&u)) q = *x;
     CHECK(q && q->items.size() + 1 == before);
 
     // Grouping: Kitchen joins Living Room, then the group is dissolved.
     a.handle(app::cmd::SetGroup{"living", {"kitchen"}});
-    run_until(3480);
+    run_until(4600);
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
     CHECK(players && players->players[0].group_members.size() == 2 && players->players[1].synced_to == "living");
     a.handle(app::cmd::Ungroup{"living"});
-    run_until(3560);
+    run_until(4700);
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
     CHECK(players && players->players[0].group_members.empty() && players->players[1].synced_to.empty());
 
     // Volume is clamped and reflected.
     a.handle(app::cmd::SetVolume{"living", 140});
-    run_until(3640);
+    run_until(4800);
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&u)) players = *p;
     CHECK(players && players->players[0].volume_level == 100);
 
     // Playlists: list (editable flag parsed), add a song, create one.
     a.handle(app::cmd::LoadPlaylists{});
-    run_until(3800);
+    run_until(4950);
     std::shared_ptr<const app::PlaylistsView> pls;
     for (auto& u : updates)
         if (auto* p = std::get_if<std::shared_ptr<const app::PlaylistsView>>(&u)) pls = *p;
@@ -125,7 +125,7 @@ TEST(test_app_with_mock) {
     updates.clear();
     a.handle(app::cmd::AddToPlaylist{pls->playlists[0], viva});
     a.handle(app::cmd::CreatePlaylist{"Kitchen songs", viva});
-    run_until(4200);
+    run_until(5400);
     std::vector<std::string> toasts;
     for (auto& u : updates)
         if (auto* t = std::get_if<app::Toast>(&u)) toasts.push_back(t->text);
@@ -410,6 +410,162 @@ TEST(a_radio_station_is_never_added_to_the_queue) {
     p.send(app::cmd::AddToQueue{station});
     p.send(app::cmd::AddToQueue{station, true});
     CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "player_queues/play_media") == 0);
+}
+
+namespace {
+bool sent_with(const Panel& p, const std::string& command, const std::string& fragment) {
+    for (size_t i = 0; i < p.mock.received.size(); ++i)
+        if (p.mock.received[i] == command && p.mock.received_args[i].find(fragment) != std::string::npos) return true;
+    return false;
+}
+}  // namespace
+
+TEST(a_song_tapped_in_a_playlist_plays_the_playlist_from_that_song) {
+    Panel p;
+    MediaItem playlist;
+    playlist.type = MediaType::Playlist;
+    playlist.uri = "library://playlist/1";
+    MediaItem song;
+    song.type = MediaType::Track;
+    song.uri = "spotify://track/7";
+    p.send(app::cmd::Play{song, playlist});
+    CHECK(sent_with(p, "player_queues/play_media", "\"media\":[\"library://playlist/1\"]"));
+    CHECK(sent_with(p, "player_queues/play_media", "\"start_item\":\"spotify://track/7\""));
+    p.send(app::cmd::Play{song, std::nullopt, true});
+    CHECK(sent_with(p, "player_queues/play_media", "\"radio_mode\":true"));
+}
+
+TEST(sleep_timer_pauses_when_it_runs_out) {
+    Panel p;
+    p.send(app::cmd::SetSleepTimer{1});
+    std::optional<int> left;
+    for (auto& u : p.updates)
+        if (auto* s = std::get_if<app::SleepTimerView>(&u)) left = s->minutes_left;
+    CHECK(left && *left == 1);
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "player_queues/pause") == 0);
+    p.run(61'000);
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "player_queues/pause") == 1);
+    for (auto& u : p.updates)
+        if (auto* s = std::get_if<app::SleepTimerView>(&u)) left = s->minutes_left;
+    CHECK(left && *left == 0);
+}
+
+TEST(switching_away_from_a_playing_speaker_offers_to_move_the_music) {
+    Panel p;  // Living Room plays in the mock
+    p.send(app::cmd::SelectPlayer{"kitchen"});
+    const app::Toast* offer = nullptr;
+    for (auto& u : p.updates)
+        if (auto* t = std::get_if<app::Toast>(&u)) offer = t;
+    CHECK(offer && offer->action && std::holds_alternative<app::cmd::TransferQueue>(*offer->action));
+    if (!offer || !offer->action) return;
+    p.send(*offer->action);
+    CHECK(sent_with(p, "player_queues/transfer", "\"source_queue_id\":\"living\""));
+    CHECK(sent_with(p, "player_queues/transfer", "\"target_queue_id\":\"kitchen\""));
+}
+
+TEST(a_removed_speaker_leaves_the_list) {
+    Panel p;
+    p.mock.remove_player("living");  // the selected one
+    p.run(300);
+    auto players = p.last<app::PlayersView>();
+    CHECK(players && players->players.size() == 1 && players->selected_id == "kitchen");
+}
+
+TEST(recent_searches_are_saved_newest_first_without_duplicates) {
+    Panel p;
+    p.send(app::cmd::SaveRecentSearch{"coldplay"});
+    p.send(app::cmd::SaveRecentSearch{"tame impala"});
+    p.send(app::cmd::SaveRecentSearch{" Coldplay "});
+    std::vector<std::string> recent;
+    for (auto& u : p.updates)
+        if (auto* r = std::get_if<app::RecentSearches>(&u)) recent = r->queries;
+    CHECK(recent.size() == 2 && recent[0] == "Coldplay" && recent[1] == "tame impala");
+    CHECK(p.settings.get("recent_searches") == "Coldplay\ntame impala");
+}
+
+TEST(a_favourite_is_removed_through_its_library_copy) {
+    Panel p;
+    MediaItem song;
+    song.type = MediaType::Track;
+    song.provider = "spotify--a1";
+    song.item_id = "7";
+    MediaItem library_copy = song;
+    library_copy.provider = "library";
+    library_copy.item_id = "12";
+    song.alternatives.push_back(library_copy);
+    p.send(app::cmd::SetFavourite{song, false});
+    CHECK(sent_with(p, "music/favorites/remove_item", "\"library_item_id\":\"12\""));
+    // Favourited from Search: the server knows its library copy.
+    MediaItem searched;
+    searched.type = MediaType::Track;
+    searched.provider = "spotify--a1";
+    searched.item_id = "1mea3bSkSGXuIRvnydlB5b";
+    p.mock.received.clear();
+    p.mock.received_args.clear();
+    p.send(app::cmd::SetFavourite{searched, false}, 500);
+    CHECK(sent_with(p, "music/favorites/remove_item", "\"library_item_id\":\"12\""));
+    song.alternatives.clear();  // not in the library at all: say so instead of doing nothing
+    p.updates.clear();
+    p.send(app::cmd::SetFavourite{song, false}, 500);
+    CHECK(p.toasts().size() == 1 && p.toasts()[0] == "Couldn't remove it from favourites");
+}
+
+TEST(library_lists_are_fetched_page_by_page) {
+    Panel p;
+    p.mock.extra_library_tracks = 1200;
+    p.mock.received.clear();
+    p.send(app::cmd::Browse{app::cmd::BrowseKind::LibraryTracks, {}}, 1000);
+    auto list = p.browse(app::cmd::BrowseKind::LibraryTracks);
+    CHECK(list && !list->loading && list->items.size() > 1200);
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "music/tracks/library_items") == 3);
+}
+
+TEST(playlist_removals_wait_for_each_other) {
+    Panel p;
+    MediaItem playlist;
+    playlist.type = MediaType::Playlist;
+    playlist.item_id = "1";
+    playlist.uri = "library://playlist/1";
+    p.mock.received.clear();
+    p.app->handle(app::cmd::RemoveFromPlaylist{playlist, 3});
+    p.app->handle(app::cmd::RemoveFromPlaylist{playlist, 4});  // tapped before the list refreshed
+    p.run(500);
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "music/playlists/remove_playlist_tracks") == 1);
+    p.send(app::cmd::RemoveFromPlaylist{playlist, 4});  // after the refresh: fine
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "music/playlists/remove_playlist_tracks") == 2);
+}
+
+TEST(setup_reports_an_old_server_and_a_silent_sign_in) {
+    Panel p([](Panel& x) {
+        x.mock.set_unconfigured();
+        x.platform.token = "";  // no phone: the token is typed
+    });
+    p.send(app::cmd::SetupGo{app::SetupStep::Server}, 2000);
+    p.send(app::cmd::SetupUseServer{"old-host"});
+    auto v = p.last<app::SetupView>();
+    CHECK(v && v->server_error && v->server_too_old && !v->checking);
+    p.send(app::cmd::SetupUseServer{"192.168.2.80"});
+    v = p.last<app::SetupView>();
+    CHECK(v && v->step == app::SetupStep::SignIn);
+    p.send(app::cmd::SetupToken{"silent"}, 9000);
+    v = p.last<app::SetupView>();
+    CHECK(v && v->token_no_answer && !v->token_error && !v->checking);
+}
+
+TEST(update_checks_then_installs_and_restarts) {
+    Panel p;
+    p.send(app::cmd::CheckUpdate{}, 800);
+    std::optional<app::UpdateView> u;
+    for (auto& x : p.updates)
+        if (auto* v = std::get_if<app::UpdateView>(&x)) u = *v;
+    CHECK(u && u->state == app::UpdateState::Available && u->version == "v9.9.9");
+    p.send(app::cmd::InstallUpdate{}, 2500);
+    CHECK(p.platform.restarted);
+    Panel offline([](Panel& x) { x.platform.published = ""; });
+    offline.send(app::cmd::CheckUpdate{}, 800);
+    for (auto& x : offline.updates)
+        if (auto* v = std::get_if<app::UpdateView>(&x)) u = *v;
+    CHECK(u && u->state == app::UpdateState::NoNetwork);
 }
 
 int main() { return check::run_all("integration"); }

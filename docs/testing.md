@@ -27,7 +27,7 @@ Three levels, each with its own executable. Every test prints `ok` or `FAIL` wit
 |---|---|---|---|
 | Unit | `test/host/build/unit_tests` | Pure functions and single classes: dedupe, title parsing, search session, protocol session, JSON parsing, artwork URLs and scaling, backoff, display text, translations | Milliseconds |
 | Integration | `test/host/build/integration_tests` | The whole core, every feature, against the mock server and fake platform: connecting, speaker choice, search, queue, playlists, grouping, setup, settings, reconnecting | Under a second |
-| End-to-end | `test/sim/build/panel_e2e` | The real UI and core, headless, operated by simulated touch: navigation, scrolling, the speaker picker, search by typing, playing a favourite, switching language, and the full first-time setup | About 30 seconds |
+| End-to-end | `test/sim/build/panel_e2e` | The real UI and core, headless, operated by simulated touch: navigation, scrolling, the speaker picker, search by typing and recent searches, playing a favourite and a playlist from a song, seeking, dragging in the queue, the sleep timer, updates, switching language, and the full first-time setup | About a minute |
 
 The unit and integration tests are built with AddressSanitizer and UndefinedBehaviorSanitizer, so memory errors and undefined behaviour fail them.
 
@@ -107,6 +107,8 @@ Use the simulator with mock data unless a step says otherwise.
 
 ### Search
 
+- [ ] After a search, the empty field shows **Recent searches**; a chip searches again.
+
 - [ ] While typing, library results appear first with "From your library, still searching everywhere…", then the full results.
 - [ ] A recording available from several sources shows once, with a "+2 sources" tag. The grey letter shows where it will play from.
 - [ ] Chips filter by media type, never by service.
@@ -116,12 +118,15 @@ Use the simulator with mock data unless a step says otherwise.
 ### Now Playing
 
 - [ ] The background colour follows the artwork.
-- [ ] Seek, shuffle, repeat, volume and favourite all work.
+- [ ] Dragging the progress line in the player bar seeks; shuffle, repeat, volume and favourite all work.
+- [ ] The moon button sets a sleep timer ("Stops in 30 min"); the music pauses when it runs out.
+- [ ] The volume sheet stays open while you use it and closes 4 s after you let go.
 - [ ] For radio, seek, skip and shuffle are hidden; a LIVE tag and a stop button appear instead.
 
 ### Queue
 
-- [ ] Tapping a song plays it; **×** removes it; holding offers Play next, Move up and Move down.
+- [ ] Tapping a song plays it; **×** removes it; the handle on the right drags it to another place; holding offers Play next, Move up and Move down.
+- [ ] Switching to another speaker while music plays offers **Move** in a toast; it takes the queue along.
 - [ ] Adding a song that is already queued shows "is already in the queue" with **Add again**.
 - [ ] After adding a song, the toast offers **Undo**.
 - [ ] **Clear** asks for confirmation, then removes everything after the current song. The music keeps playing.
@@ -129,7 +134,9 @@ Use the simulator with mock data unless a step says otherwise.
 ### Library
 
 - [ ] The tabs are Favourites, Playlists, Albums, Artists, Tracks and Radio.
-- [ ] A playlist offers Play, Shuffle and Favourite.
+- [ ] A playlist offers Play, Shuffle and Favourite. Tapping a song plays the playlist from that song on.
+- [ ] An artist shows their albums above the songs.
+- [ ] Scrolling a long playlist stays where it is when the song changes.
 - [ ] **Edit** appears only on playlists you can change. In edit mode, **×** removes a song and **Delete playlist** asks for confirmation.
 
 ### Settings
@@ -163,4 +170,4 @@ A useful report includes:
 
 ## What a PC cannot test
 
-Touch feel, scrolling smoothness, frame rate and memory use on the ESP32-P4, the Wi-Fi chip, the backlight and the hardware JPEG decoder. These are measured on the device once board support is in place.
+Touch feel, scrolling smoothness, frame rate and memory use on the ESP32-P4, the Wi-Fi chip, the backlight and the hardware JPEG decoder. These are checked on the device: the serial log prints a heap line every 30 s.

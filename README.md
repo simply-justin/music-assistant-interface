@@ -26,9 +26,10 @@ Music Assistant brings Spotify, YouTube Music, radio and your own files together
 
 - **One search across every source.** Your library answers instantly while streaming services are still searching, and a song that is on three services shows up once, not three times.
 - **Any speaker, any group.** Choose the speaker from the player bar, group speakers and set the volume per speaker or for the whole group.
-- **Full playback control.** Now Playing, a queue you can edit (play next, move, remove, undo) and playlist editing.
+- **Full playback control.** A song tapped in an album or playlist plays on through it. Drag the progress line to seek, drag songs in the queue to reorder them, start a radio from any song, set a sleep timer and move the music to another speaker when you switch.
 - **Made for the wall.** Touch targets of at least 56 px, so you hit them at arm's length. The screen dims to a clock when idle and follows a night schedule.
 - **Guided setup.** Pick a Wi-Fi network and find the server, then sign in by scanning a QR code with your phone instead of typing a token.
+- **Updates over Wi-Fi.** Settings › About checks for a newer release and installs it. A version that fails to start is rolled back on its own.
 - **Your look.** Light and dark modes, six accent colours, three corner styles and a reduced-motion setting.
 - **Multilingual.** English and Dutch ship today. Adding a language takes one column in a CSV file and no code.
 
@@ -87,8 +88,8 @@ The [Getting started](docs/getting-started.md) tutorial covers the prerequisites
 | First-time setup flow (logic and screens) | Done |
 | PC simulator, command-line test client | Done |
 | Unit, integration and end-to-end tests, CI on every push | Done |
-| Board support: display, touch, backlight, Wi-Fi via the ESP32-C6, server discovery, phone pairing page, hardware JPEG artwork | Built; not yet verified on the device |
-| Over-the-air updates | Planned; two app slots reserved |
+| Board support: display, touch, backlight, Wi-Fi via the ESP32-C6, server discovery, phone pairing page, hardware JPEG artwork | Runs on the device |
+| Over-the-air updates from GitHub releases, with rollback | Built; the first release still has to be published |
 
 ## Contributing
 

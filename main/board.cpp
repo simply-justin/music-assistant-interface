@@ -1,6 +1,6 @@
-// Board services for the Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1. Written against ESP-IDF 5.5 and
-// the Waveshare BSP; it compiles in CI but is not yet verified on the hardware (see
-// docs/architecture.md, Known limitations).
+// Board services for the Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1 (ESP-IDF 5.5.6, Waveshare BSP):
+// Wi-Fi, discovery, the pairing page, backlight, time and firmware updates. Device lessons are
+// in docs/architecture.md, Known limitations.
 #include "board.hpp"
 
 #include <algorithm>
@@ -11,7 +11,9 @@
 #include "bsp/esp-bsp.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
+#include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
+#include "esp_https_ota.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -398,5 +400,86 @@ int BoardPlatform::local_minutes() {
 }
 
 void BoardPlatform::restart() { esp_restart(); }
+
+// ---- Firmware updates (esp_https_ota from the release URL; GitHub redirects to its CDN)
+
+namespace {
+
+esp_http_client_config_t update_http() {
+    esp_http_client_config_t http{};
+    http.url = CONFIG_PANEL_UPDATE_URL;
+    http.crt_bundle_attach = esp_crt_bundle_attach;
+    http.timeout_ms = 15000;
+    http.buffer_size = 4096;
+    http.buffer_size_tx = 2048;  // the CDN redirect URL is long
+    http.keep_alive_enable = true;
+    return http;
+}
+
+// Blocking work on a short-lived task; `fn` gets the Post to report back on the core task.
+void run_task(const char* name, Post post, std::function<void(Post&)> fn) {
+    struct Job {
+        Post post;
+        std::function<void(Post&)> fn;
+    };
+    auto* job = new Job{std::move(post), std::move(fn)};
+    auto run = [](void* arg) {
+        std::unique_ptr<Job> j(static_cast<Job*>(arg));
+        j->fn(j->post);
+        j.reset();
+        vTaskDelete(nullptr);
+    };
+    // 8 KB: TLS handshake + esp_https_ota.
+    if (xTaskCreate(run, name, 8 * 1024, job, 3, nullptr) != pdPASS) {
+        Job copy = std::move(*job);
+        delete job;
+        copy.fn(copy.post);  // shortcut: runs inline when no task could be made (low memory)
+    }
+}
+
+}  // namespace
+
+void BoardPlatform::update_check(std::function<void(std::string, bool)> done) {
+    if (!wifi_status().connected) return s_->post([done] { done("", false); });
+    run_task("ota_check", s_->post, [done](Post& post) {
+        esp_http_client_config_t http = update_http();
+        esp_https_ota_config_t cfg{};
+        cfg.http_config = &http;
+        esp_https_ota_handle_t h = nullptr;
+        std::string version;
+        if (esp_https_ota_begin(&cfg, &h) == ESP_OK) {
+            esp_app_desc_t desc{};
+            if (esp_https_ota_get_img_desc(h, &desc) == ESP_OK) version = desc.version;
+            esp_https_ota_abort(h);
+        }
+        ESP_LOGI(TAG, "update check: %s", version.empty() ? "nothing readable" : version.c_str());
+        post([done, version] { done(version, true); });
+    });
+}
+
+void BoardPlatform::update_install(std::function<void(int)> progress, std::function<void(bool)> done) {
+    run_task("ota_install", s_->post, [progress, done](Post& post) {
+        esp_http_client_config_t http = update_http();
+        esp_https_ota_config_t cfg{};
+        cfg.http_config = &http;
+        esp_https_ota_handle_t h = nullptr;
+        bool ok = esp_https_ota_begin(&cfg, &h) == ESP_OK;
+        int shown = -1;
+        esp_err_t err = ESP_FAIL;
+        while (ok && (err = esp_https_ota_perform(h)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            int size = esp_https_ota_get_image_size(h), read = esp_https_ota_get_image_len_read(h);
+            int pct = size > 0 ? read * 100 / size : 0;
+            if (pct / 5 != shown / 5) {  // every 5 %: enough for the bar, few messages
+                shown = pct;
+                post([progress, pct] { progress(pct); });
+            }
+        }
+        if (ok) ok = err == ESP_OK && esp_https_ota_is_complete_data_received(h);
+        if (ok) ok = esp_https_ota_finish(h) == ESP_OK;  // checks the image, sets it as the boot partition
+        else if (h) esp_https_ota_abort(h);
+        ESP_LOGI(TAG, "update install: %s", ok ? "done, restarting" : "failed");
+        post([done, ok] { done(ok); });
+    });
+}
 
 }  // namespace board

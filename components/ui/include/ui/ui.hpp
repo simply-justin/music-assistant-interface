@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 // The panel UI (LVGL 9). Runs on the GUI task only: create the LVGL display first, call start(),
 // then feed every core Update to apply(). Commands go out through the Send callback.
 #include <functional>
@@ -23,6 +24,9 @@ struct ArtRequest {
     std::string url;
     int w, h, radius;
     uint32_t bg;  // 0xRRGGBB behind the rounded corners
+    // How many boxes on screen still wait for this image. A loader skips the download at 0 (the
+    // rows were scrolled away before their turn came).
+    std::shared_ptr<std::atomic<int>> wanted;
 };
 using ArtLoader = std::function<void(ArtRequest, std::function<void(std::shared_ptr<img::Bitmap>)>)>;
 void set_art_loader(ArtLoader loader, size_t cache_budget_bytes);

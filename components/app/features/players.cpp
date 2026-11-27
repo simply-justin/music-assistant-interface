@@ -21,7 +21,14 @@ public:
     }
 
     void on_event(const backend::Event& ev) override {
-        if (ev.name != "player_updated" || !ev.data) return;
+        if (ev.name == "player_removed") {
+            auto gone = find(ev.object_id);
+            if (gone == view_.players.end()) return;
+            view_.players.erase(gone);
+            if (ev.object_id == view_.selected_id) return select(pick_initial());
+            return publish();
+        }
+        if ((ev.name != "player_updated" && ev.name != "player_added") || !ev.data) return;
         core::PlayerState updated = ma::parse::player(ev.data.get());
         auto it = find(updated.player_id);
         if (it == view_.players.end()) view_.players.push_back(std::move(updated));
@@ -31,6 +38,14 @@ public:
 
     void on_command(const Command& c) override {
         if (auto* s = std::get_if<cmd::SelectPlayer>(&c)) {
+            // Switching away from a speaker that plays: offer to take the music along.
+            auto from = find(view_.selected_id), to = find(s->player_id);
+            if (from != view_.players.end() && to != view_.players.end() && from != to &&
+                from->state == core::PlaybackState::Playing) {
+                ctx_.publish(Toast{i18n::tr(i18n::Str::toast_move_music, to->name),
+                                   Command{cmd::TransferQueue{from->player_id, to->player_id}},
+                                   i18n::tr(i18n::Str::toast_move)});
+            }
             ctx_.settings.set("player", s->player_id);
             select(s->player_id);
         } else if (auto* g = std::get_if<cmd::SetGroup>(&c)) {

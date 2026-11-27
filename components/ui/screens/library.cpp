@@ -82,7 +82,6 @@ private:
             kit::text(content_, tr(loading ? i18n::Str::list_loading : i18n::Str::list_empty), theme::lead(), theme::text2());
             return;
         }
-        constexpr size_t kMax = 300;  // shortcut: card grids are capped, not windowed yet
         if (tab_ == Tab::Tracks || tab_ == Tab::Radio) {
             auto list = std::make_shared<std::vector<core::MediaItem>>(std::move(items));
             kit::virtual_list(content_, list->size(), 72, 0, [list](lv_obj_t* parent, size_t i) {
@@ -94,16 +93,22 @@ private:
             });
             return;
         }
-        // The same six-column grid as Home: 152 px covers, 16 px apart.
-        lv_obj_t* grid = kit::row(content_, 16);
-        lv_obj_set_width(grid, lv_pct(100));
-        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-        lv_obj_set_style_pad_row(grid, 24, 0);
-        lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-        for (size_t i = 0; i < items.size() && i < kMax; ++i) {
-            const auto& it = items[i];
-            kit::media_card(grid, it, kit::subtitle(it), [it] { open_item(it); }, 152);
-        }
+        // The same six-column grid as Home: 152 px covers, 16 px apart. Windowed by row of six, so
+        // a library of thousands of albums only builds the rows on screen.
+        constexpr size_t kPerRow = 6;
+        constexpr int32_t kCardRowH = 212;  // cover + name + subtitle
+        auto all = std::make_shared<std::vector<core::MediaItem>>(std::move(items));
+        size_t rows = (all->size() + kPerRow - 1) / kPerRow;
+        kit::virtual_list(content_, rows, kCardRowH, 24, [all](lv_obj_t* list, size_t r) {
+            lv_obj_t* row = kit::row(list, 16);
+            lv_obj_set_size(row, lv_pct(100), kCardRowH);
+            lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+            for (size_t i = r * kPerRow; i < all->size() && i < (r + 1) * kPerRow; ++i) {
+                const auto& it = (*all)[i];
+                kit::media_card(row, it, kit::subtitle(it), [it] { open_item(it); }, 152);
+            }
+            return row;
+        });
     }
 
     lv_obj_t *tabs_ = nullptr, *content_ = nullptr;

@@ -130,7 +130,12 @@ void MockBackend::start() {
         if (!listener_.on_connection) return;
         ServerInfo info{"mock", "mock", 65};
         if (url_.find("bad") != std::string::npos) return listener_.on_connection(Connection::Disconnected, {});
+        if (url_.find("old") != std::string::npos) {
+            info.schema_version = 20;
+            return listener_.on_connection(Connection::IncompatibleServer, info);
+        }
         listener_.on_connection(Connection::Connecting, info);
+        if (token_ == "silent") return;
         Connection c = token_.empty() ? Connection::AuthRequired : token_ == "bad" ? Connection::AuthFailed : Connection::Connected;
         listener_.on_connection(c, info);
     });
@@ -173,8 +178,20 @@ void MockBackend::set_player_state(const std::string& player_id, const std::stri
     }
 }
 
+void MockBackend::remove_player(const std::string& player_id) {
+    for (int i = 0; i < cJSON_GetArraySize(players_.get()); ++i) {
+        if (json_str(cJSON_GetArrayItem(players_.get(), i), "player_id") != player_id) continue;
+        cJSON_DeleteItemFromArray(players_.get(), i);
+        emit("player_removed", player_id, nullptr);
+        return;
+    }
+}
+
 Response MockBackend::handle(const Request& req) {
     received.push_back(req.command);
+    char* printed = req.args ? cJSON_PrintUnformatted(req.args.get()) : nullptr;
+    received_args.push_back(printed ? printed : "");
+    cJSON_free(printed);
     const cJSON* args = req.args.get();
     Response r;
     r.ok = true;
@@ -217,6 +234,22 @@ Response MockBackend::handle(const Request& req) {
             if (favourites ? !json_bool(item, "favorite") : json_str(item, "provider") != "library") continue;
             cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
         }
+        if (type == "track" && !favourites)
+            for (int n = 0; n < extra_library_tracks; ++n) {
+                cJSON* t = cJSON_CreateObject();
+                cJSON_AddStringToObject(t, "media_type", "track");
+                cJSON_AddStringToObject(t, "item_id", ("x" + std::to_string(n)).c_str());
+                cJSON_AddStringToObject(t, "provider", "library");
+                cJSON_AddStringToObject(t, "name", ("Song " + std::to_string(n)).c_str());
+                cJSON_AddStringToObject(t, "uri", ("library://track/x" + std::to_string(n)).c_str());
+                cJSON_AddItemToArray(r.result.get(), t);
+            }
+        // Pages like the server.
+        int offset = static_cast<int>(json_num(args, "offset")), limit = static_cast<int>(json_num(args, "limit", 500));
+        cJSON* page = cJSON_CreateArray();
+        for (int i = offset; i < offset + limit && i < cJSON_GetArraySize(r.result.get()); ++i)
+            cJSON_AddItemToArray(page, cJSON_Duplicate(cJSON_GetArrayItem(r.result.get(), i), true));
+        r.result.reset(page);
     } else if (c == "music/recently_played_items" || c == "music/playlists/playlist_tracks" ||
                c == "music/albums/album_tracks" || c == "music/artists/artist_tracks") {
         // Playlists are long (~400 songs) so the windowed lists get exercised.
@@ -234,6 +267,21 @@ Response MockBackend::handle(const Request& req) {
                 cJSON_AddItemToArray(r.result.get(), copy);
             }
         }
+    } else if (c == "music/get_library_item") {
+        // The library item that maps this provider item, else null.
+        std::string id = json_str(args, "item_id");
+        const cJSON* item;
+        cJSON_ArrayForEach(item, catalog_.get()) {
+            if (json_str(item, "provider") != "library") continue;
+            const cJSON* pm;
+            cJSON_ArrayForEach(pm, cJSON_GetObjectItemCaseSensitive(item, "provider_mappings"))
+                if (json_str(pm, "item_id") == id) r.result.reset(cJSON_Duplicate(item, true));
+        }
+    } else if (c == "music/artists/artist_albums") {
+        r.result.reset(cJSON_CreateArray());
+        const cJSON* item;
+        cJSON_ArrayForEach(item, catalog_.get()) if (json_str(item, "media_type") == "album")
+            cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(item, true));
     } else if (c == "providers") {
         r.result.reset(cJSON_Parse(R"json([
           {"instance_id":"builtin","domain":"builtin","name":"Music Assistant","available":true,"is_streaming_provider":false},
@@ -246,12 +294,28 @@ Response MockBackend::handle(const Request& req) {
     } else if (c == "players/all") {
         r.result.reset(cJSON_Duplicate(players_.get(), true));
     } else if (c == "player_queues/items") {
-        r.result.reset(cJSON_Duplicate(queue_.get(), true));
+        int limit = static_cast<int>(json_num(args, "limit", 500)), offset = static_cast<int>(json_num(args, "offset"));
+        r.result.reset(cJSON_CreateArray());
+        for (int i = offset; i < offset + limit && i < cJSON_GetArraySize(queue_.get()); ++i)
+            cJSON_AddItemToArray(r.result.get(), cJSON_Duplicate(cJSON_GetArrayItem(queue_.get(), i), true));
     } else if (c == "player_queues/play_media") {
         std::string option = json_str(args, "option");
         if (option != "add" && option != "next") queue_.reset(cJSON_CreateArray());
         const cJSON* uri;
-        cJSON_ArrayForEach(uri, cJSON_GetObjectItemCaseSensitive(args, "media")) add_to_queue(uri->valuestring);
+        cJSON_ArrayForEach(uri, cJSON_GetObjectItemCaseSensitive(args, "media")) {
+            std::string u = uri->valuestring;
+            if (u.find("://playlist/") == std::string::npos && u.find("://album/") == std::string::npos) {
+                add_to_queue(u);
+                continue;
+            }
+            // A list: its songs (every catalog track), from start_item on, like the server.
+            std::vector<std::string> songs;
+            const cJSON* it;
+            cJSON_ArrayForEach(it, catalog_.get()) if (json_str(it, "media_type") == "track") songs.push_back(json_str(it, "uri"));
+            auto start = std::find(songs.begin(), songs.end(), json_str(args, "start_item"));
+            if (start != songs.end()) std::rotate(songs.begin(), start, songs.end());
+            for (const auto& s : songs) add_to_queue(s);
+        }
         emit("queue_items_updated", json_str(args, "queue_id"), nullptr);
         emit("queue_updated", json_str(args, "queue_id"), queue_object(json_str(args, "queue_id")));
     } else if (c == "player_queues/clear") {

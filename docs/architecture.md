@@ -145,5 +145,7 @@ When the connection drops, the panel shows "Can't reach Music Assistant" with a 
   - **Touch** arrives in the panel's portrait coordinates (the adapter rotates the image in hardware) and is swapped and mirrored in `start_ui()`.
   - **Memory:** ordinary allocations and JSON go to PSRAM, so the internal RAM stays free for the Wi-Fi link's DMA buffers. The serial log prints a heap line every 30 s.
   - **Diagnosis:** a hung screen trips the task watchdog after 5 s, which writes a core dump to the serial log (`python -m esp_coredump info_corefile -t b64 -c <dump> build/music_panel.elf`).
+  - **Requests** time out after 30 s (`ma::Session::kTimeoutMs`), and the queues between the socket, core and UI tasks wait instead of dropping, so a lost reply can't leave a screen loading forever.
 - **Playback errors** appear only when Music Assistant marks the current queue item as unavailable. A richer error signal is an open question.
-- Wi-Fi via the ESP32-C6, PSRAM, flash size, the partition layout and the chip revision will follow Waveshare's reference examples.
+- **Lists** are fetched in pages of 500 and stop at 5,000 items (queue and library lists).
+- **Server discovery** shows every server as "Music Assistant" with its address: the mDNS announcement carries only the server's id, not a name.

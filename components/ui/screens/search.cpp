@@ -57,8 +57,13 @@ public:
         lv_obj_set_style_pad_bottom(results_, 24, 0);
         // Touching or scrolling the results puts the keyboard away (the field brings it back).
         auto hide = [](lv_event_t* e) { static_cast<Search*>(lv_event_get_user_data(e))->show_keyboard(false); };
-        lv_obj_add_event_cb(results_, hide, LV_EVENT_PRESSED, this);
         lv_obj_add_event_cb(results_, hide, LV_EVENT_SCROLL_BEGIN, this);
+        // A touch in the results means the search found something: remember it (Recent searches).
+        lv_obj_add_event_cb(results_, [](lv_event_t* e) {
+            auto* self = static_cast<Search*>(lv_event_get_user_data(e));
+            self->show_keyboard(false);
+            self->remember();
+        }, LV_EVENT_PRESSED, this);
         build_keyboard(root);
     }
 
@@ -74,9 +79,16 @@ public:
     std::string title() const override { return tr(i18n::Str::nav_search); }
 
 private:
+    void remember() {
+        const char* text = lv_textarea_get_text(input_);
+        if (text[0] && state().search && state().search->status != core::SearchStatus::Idle) send(app::cmd::SaveRecentSearch{text});
+    }
+
     void build_keyboard(lv_obj_t* root) {
-        kb_ = kit::keyboard(root, input_, tr(i18n::Str::key_search), tr(i18n::Str::key_space),
-                            [this] { show_keyboard(false); });
+        kb_ = kit::keyboard(root, input_, tr(i18n::Str::key_search), tr(i18n::Str::key_space), [this] {
+            show_keyboard(false);
+            remember();
+        });
         lv_obj_add_flag(kb_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width(kb_, theme::kScreenW - theme::kSideW);
         lv_obj_align(kb_, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -141,7 +153,18 @@ private:
         const core::SearchView* v = state().search.get();
         if (!v || v->query.empty()) {
             lv_label_set_text(status_, "");
-            kit::text(results_, tr(i18n::Str::search_hint), theme::lead(), theme::text2(), true);
+            const auto& recent = state().recent_searches;
+            if (recent.empty()) {
+                kit::text(results_, tr(i18n::Str::search_hint), theme::lead(), theme::text2(), true);
+                return;
+            }
+            section(tr(i18n::Str::search_recent));
+            lv_obj_t* chips = kit::row(results_, 12);
+            lv_obj_set_width(chips, lv_pct(100));
+            lv_obj_set_flex_flow(chips, LV_FLEX_FLOW_ROW_WRAP);
+            lv_obj_set_style_pad_row(chips, 12, 0);
+            for (const auto& q : recent)
+                kit::chip(chips, icon::search, q, false, [this, q] { lv_textarea_set_text(input_, q.c_str()); });
             return;
         }
         const auto& r = v->result;

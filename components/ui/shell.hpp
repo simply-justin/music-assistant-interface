@@ -1,5 +1,6 @@
 #pragma once
 // Internal: shared UI state, the Screen interface and helpers for screens and overlays.
+#include <deque>
 #include <map>
 #include <memory>
 #include <optional>
@@ -12,7 +13,7 @@
 namespace ui {
 
 // What changed, so a screen can skip work (e.g. a progress tick must not rebuild lists).
-enum class Topic : uint8_t { All, Connection, Players, Queue, Progress, Search, Playlists, Browse, Setup, Panel };
+enum class Topic : uint8_t { All, Connection, Players, Queue, Progress, Search, Playlists, Browse, Setup, Panel, Sleep, Update };
 
 // Latest snapshot of every core view.
 struct State {
@@ -25,6 +26,13 @@ struct State {
     std::shared_ptr<const app::SetupView> setup;
     std::shared_ptr<const app::PanelView> panel;
     bool ever_connected = false;
+    uint32_t connected_epoch = 0;  // +1 on every (re)connect: screens reload their lists
+    std::vector<std::string> recent_searches;
+    int sleep_minutes = 0;         // sleep timer, 0 = off
+    app::UpdateView update;
+    // Hearts tapped here, by uri: shown at once, whatever the (older) snapshot of the item says.
+    std::map<std::string, bool> favourite_override;
+    bool favourite(const core::MediaItem& m) const;
     uint32_t elapsed_s = 0;  // local 1 Hz clock, re-synced from the queue
     // A song just tapped: shown as playing right away, until the queue confirms it (the server and
     // speaker take ~3 s) or kPendingMs passes.
@@ -105,7 +113,10 @@ void open_group(const std::string& leader_id);
 // Warning banner (offline, provider down, playback error).
 lv_obj_t* banner(lv_obj_t* parent, const std::string& title, const std::string& body);
 lv_obj_t* speaker_chip(lv_obj_t* parent);
-void play(const core::MediaItem& item);  // Play now (tap on a row/card that plays)
+// Play now (tap on a row/card that plays). `context`: the album or playlist it was tapped in, so the
+// rest of that list follows. `radio`: endless similar songs after it.
+void play(const core::MediaItem& item, const std::optional<core::MediaItem>& context = std::nullopt, bool radio = false);
+void set_favourite(const core::MediaItem& item, bool on);  // heart: shows at once, then tells the server
 void open_item(const core::MediaItem& item);  // tap: tracks/radio play, others open their detail
 
 }  // namespace ui

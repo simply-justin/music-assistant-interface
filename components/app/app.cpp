@@ -28,7 +28,7 @@ void Context::send(backend::Request req, std::function<void(backend::Response&&)
 }
 
 App::App(backend::Backend& backend, Settings& settings, Platform& platform, std::function<void(Update)> publish)
-    : ctx_{backend, settings, platform, std::move(publish), {}, 0, {}, {}, {}} {
+    : ctx_{backend, settings, platform, std::move(publish), {}, 0, {}, {}, false, {}} {
     ctx_.dispatch = [this](Command c) { handle(c); };
 }
 

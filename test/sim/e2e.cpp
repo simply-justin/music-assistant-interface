@@ -250,6 +250,28 @@ void close_overlays() {
     g_panel->run(100);
 }
 
+
+// The newest command the mock server received with this name, with its args as JSON ("" = none).
+std::string last_args(const std::string& command) {
+    const auto& m = g_panel->mock;
+    for (size_t i = m.received.size(); i-- > 0;)
+        if (m.received[i] == command) return m.received_args[i];
+    return "";
+}
+
+size_t open_sheets() {
+    size_t n = 0;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(lv_layer_top()); ++i)
+        if (lv_obj_get_user_data(lv_obj_get_child(lv_layer_top(), static_cast<int32_t>(i))) == reinterpret_cast<void*>(0x5CA1)) ++n;
+    return n;
+}
+
+// Press, move in steps, release: a drag that starts on `o` (a handle, a slider knob).
+void drag_from(lv_obj_t* o, int32_t dx, int32_t dy) {
+    lv_point_t from = center(o);
+    drag(from, {from.x + dx, from.y + dy});
+}
+
 // ---- Scenarios (mock data: speakers Living Room + Kitchen, Viva La Vida in three sources)
 
 TEST(home_shows_the_main_sections) {
@@ -408,6 +430,185 @@ TEST(radio_hold_menu_has_no_queue_actions) {
     CHECK(find_text("Remove from favourites"));  // the menu is open
     CHECK(!find_text("Add to queue") && !find_text("Play next"));
     close_overlays();
+}
+
+// A song in a playlist plays the playlist from that song, so the rest follows.
+TEST(a_song_in_a_playlist_plays_on_through_the_playlist) {
+    core::MediaItem pl;
+    pl.type = core::MediaType::Playlist;
+    pl.item_id = "1";
+    pl.provider = "library";
+    pl.name = "Friday Night Mix";
+    pl.uri = "library://playlist/1";
+    ui::open_detail(pl);
+    g_panel->run(600);
+    CHECK(tap("Yellow"));
+    std::string args = last_args("player_queues/play_media");
+    CHECK(args.find("\"media\":[\"library://playlist/1\"]") != std::string::npos);
+    CHECK(args.find("\"start_item\":\"spotify://track/7\"") != std::string::npos);
+    g_panel->run(400);
+    CHECK(g_panel->queue && g_panel->queue->items.size() > 1);  // the list came along
+}
+
+// The song changing must not throw the list back to the top while someone is scrolling it.
+TEST(a_detail_list_keeps_its_place_when_the_song_changes) {
+    core::MediaItem pl;
+    pl.type = core::MediaType::Playlist;
+    pl.item_id = "1";
+    pl.provider = "library";
+    pl.name = "Friday Night Mix";
+    pl.uri = "library://playlist/1";
+    ui::open_detail(pl);
+    g_panel->run(600);
+    lv_obj_t* row = find_text("Yellow");
+    lv_obj_t* list = row ? scroll_parent(row) : nullptr;
+    CHECK(list);
+    if (!list) return;
+    drag({900, 650}, {900, 250});
+    int32_t y = lv_obj_get_scroll_y(list);
+    CHECK(y > 0);
+    g_panel->core->handle(app::cmd::Next{});  // any queue change rebuilds the page
+    auto q = std::make_shared<core::QueueState>(*g_panel->queue);
+    q->current_index = q->current_index + 1;
+    if (q->current_index < static_cast<int>(q->items.size())) q->current = q->items[static_cast<size_t>(q->current_index)];
+    ui::apply(std::shared_ptr<const core::QueueState>(q));
+    g_panel->run(200);
+    row = find_text("Yellow");
+    list = row ? scroll_parent(row) : nullptr;
+    CHECK(list && lv_obj_get_scroll_y(list) == y);
+}
+
+TEST(an_artist_shows_their_albums) {
+    core::MediaItem artist;
+    artist.type = core::MediaType::Artist;
+    artist.item_id = "3";
+    artist.provider = "library";
+    artist.name = "Coldplay";
+    artist.uri = "library://artist/3";
+    ui::open_detail(artist);
+    g_panel->run(600);
+    CHECK(find_text("Albums"));
+    CHECK(find_text("Parachutes"));
+    ui::open(ui::ScreenId::Home);
+}
+
+// The progress line in the player bar seeks.
+TEST(dragging_the_progress_line_seeks) {
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(400);
+    lv_obj_t* progress = find_type(&lv_slider_class);  // the first slider: the bar's progress (volume is right of it)
+    CHECK(progress);
+    if (!progress) return;
+    g_panel->mock.received.clear();
+    g_panel->mock.received_args.clear();
+    lv_area_t a;
+    lv_obj_get_coords(progress, &a);
+    press_at({a.x1 + (a.x2 - a.x1) / 4, (a.y1 + a.y2) / 2}, 120);
+    std::string args = last_args("player_queues/seek");
+    CHECK(!args.empty() && args.find("\"position\"") != std::string::npos);
+}
+
+// The volume sheet waits for the hand to leave, not 4 s from opening.
+TEST(the_volume_sheet_stays_while_used) {
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(300);
+    CHECK(tap(ui::icon::volume));
+    CHECK(open_sheets() == 1);
+    g_panel->run(2500);
+    lv_obj_t* slider = find_type(&lv_slider_class);  // the sheet's slider (overlays come first)
+    CHECK(slider);
+    if (slider) press_at(center(slider), 2500);  // still touching after 4 s since it opened
+    CHECK(open_sheets() == 1);
+    g_panel->run(4500);  // hands off
+    CHECK(open_sheets() == 0);
+}
+
+// The handle drags a song further down the queue.
+TEST(the_queue_handle_moves_a_song) {
+    for (const char* uri : {"library://track/t5", "ytmusic://track/live1"}) {
+        core::MediaItem m;
+        m.type = core::MediaType::Track;
+        m.uri = uri;
+        g_panel->core->handle(app::cmd::AddToQueue{m, false, true});
+    }
+    g_panel->run(800);
+    CHECK(tap("Queue"));
+    g_panel->run(300);
+    lv_obj_t* handle = find_text(ui::icon::drag);
+    CHECK(handle);
+    if (!handle) return;
+    g_panel->mock.received.clear();
+    g_panel->mock.received_args.clear();
+    drag_from(handle, 0, 85);  // one row (76 + 4 px) down
+    std::string args = last_args("player_queues/move_item");
+    CHECK(args.find("\"pos_shift\":1") != std::string::npos);
+    tap("Home");
+}
+
+TEST(search_remembers_what_was_searched) {
+    CHECK(tap("Search"));
+    lv_obj_t* input = find_type(&lv_textarea_class);
+    CHECK(input);
+    if (!input) return;
+    lv_textarea_set_text(input, "");
+    press_at(center(input), 80);  // the field brings the keyboard
+    type("yellow");
+    g_panel->run(1200);
+    lv_obj_t* kb = find_type(&lv_buttonmatrix_class);
+    CHECK(kb);
+    if (!kb) return;
+    lv_area_t a = area(kb);
+    int32_t row_h = (lv_area_get_height(&a) - 32 - 3 * 10) / 4;
+    press_at({a.x2 - 80, a.y1 + 16 + row_h + 10 + row_h / 2}, 80);  // the Search key, end of row 2
+    g_panel->run(300);
+    CHECK(g_panel->settings.get("recent_searches").rfind("yellow", 0) == 0);  // newest first
+    lv_textarea_set_text(input, "");
+    g_panel->run(600);
+    CHECK(find_text("Recent searches"));
+    CHECK(tap("yellow"));  // the chip searches again
+    CHECK(std::string(lv_textarea_get_text(input)) == "yellow");
+    lv_textarea_set_text(input, "");
+    g_panel->run(400);
+    tap("Home");
+}
+
+TEST(sleep_timer_from_now_playing) {
+    ui::open(ui::ScreenId::NowPlaying);
+    g_panel->run(400);
+    CHECK(tap(ui::icon::moon));
+    CHECK(tap("30 min"));
+    g_panel->run(300);
+    CHECK(find_text("Stops in 30 min"));
+    CHECK(tap(ui::icon::moon));
+    CHECK(tap("Off"));
+    g_panel->run(300);
+    CHECK(!find_text("Stops in 30 min"));
+    ui::open(ui::ScreenId::Home);
+}
+
+TEST(settings_finds_and_installs_an_update) {
+    ui::open_settings_page(ui::SettingsPage::About);
+    g_panel->run(400);
+    CHECK(tap("Check for updates"));
+    g_panel->run(800);
+    CHECK(find_text("Version v9.9.9 is available"));
+    CHECK(tap("Install and restart"));
+    g_panel->run(2600);
+    CHECK(g_panel->platform.restarted);
+    ui::open(ui::ScreenId::Home);
+}
+
+// A heart turns at once, before the server's lists catch up.
+TEST(a_heart_changes_at_once) {
+    ui::open(ui::ScreenId::NowPlaying);
+    g_panel->run(400);
+    bool filled = find_text(ui::icon::heart_filled);
+    CHECK(tap(filled ? ui::icon::heart_filled : ui::icon::heart));
+    g_panel->run(100);
+    CHECK(filled ? find_text(ui::icon::heart) != nullptr : find_text(ui::icon::heart_filled) != nullptr);
+    CHECK(tap(filled ? ui::icon::heart : ui::icon::heart_filled));  // and back
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(300);
 }
 
 TEST(language_switch_applies_instantly) {

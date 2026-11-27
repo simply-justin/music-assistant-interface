@@ -15,7 +15,7 @@ std::vector<std::unique_ptr<Feature>> make_features(Context& ctx) {
     f.push_back(make_preferences(ctx));
     f.push_back(make_playlists(ctx));
     f.push_back(make_browse(ctx));
-    // OTA: reserved seam, add make_ota(ctx) here once the partition layout is set (Phase 1).
+    f.push_back(make_update(ctx));
     return f;
 }
 

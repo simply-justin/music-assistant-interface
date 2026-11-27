@@ -27,15 +27,22 @@ public:
     void on_connection(backend::Connection c) override {
         if (!view_.checking) return;
         using backend::Connection;
+        if (view_.step == SetupStep::Server && c == Connection::IncompatibleServer) {
+            view_.checking = false;
+            view_.server_error = view_.server_too_old = true;
+            return publish();
+        }
         if (view_.step == SetupStep::Server && (c == Connection::AuthRequired || c == Connection::Connected)) {
             // The server answered. Remember it, then sign in (or skip if it needs no token).
             ctx_.settings.set("server_url", to_url(view_.address));
             view_.checking = false;
             view_.server_error = false;
             go(c == Connection::Connected ? SetupStep::Speaker : SetupStep::SignIn);
-        } else if (view_.step == SetupStep::SignIn && (c == Connection::Connected || c == Connection::AuthFailed)) {
+        } else if (view_.step == SetupStep::SignIn && c != Connection::Connecting && c != Connection::Disconnected) {
+            // Disconnected also comes from configure() restarting the socket: a real drop ends in the timeout.
             view_.checking = false;
             view_.token_error = c == Connection::AuthFailed;
+            view_.token_no_answer = c != Connection::Connected && c != Connection::AuthFailed;
             if (c == Connection::Connected) {
                 ctx_.settings.set("token", pending_token_);
                 ctx_.platform.pairing_stop();
@@ -47,11 +54,11 @@ public:
     }
 
     void tick() override {
-        if (view_.checking && view_.step == SetupStep::Server && ctx_.now_ms - check_started_ > kServerTimeoutMs) {
-            view_.checking = false;
-            view_.server_error = true;  // "Nothing answered at that address"
-            publish();
-        }
+        if (!view_.checking || ctx_.now_ms - check_started_ <= kServerTimeoutMs) return;
+        view_.checking = false;
+        if (view_.step == SetupStep::Server) view_.server_error = true;  // "Nothing answered at that address"
+        else if (view_.step == SetupStep::SignIn) view_.token_no_answer = true;
+        publish();
     }
 
     void on_command(const Command& c) override {
@@ -75,14 +82,15 @@ public:
         } else if (auto* u = std::get_if<cmd::SetupUseServer>(&c)) {
             view_.address = u->address;
             view_.checking = true;
-            view_.server_error = false;
+            view_.server_error = view_.server_too_old = false;
             check_started_ = ctx_.now_ms;
             publish();
             ctx_.backend.configure(to_url(u->address), "");
         } else if (auto* t = std::get_if<cmd::SetupToken>(&c)) {
             pending_token_ = t->token;
             view_.checking = true;
-            view_.token_error = false;
+            view_.token_error = view_.token_no_answer = false;
+            check_started_ = ctx_.now_ms;
             publish();
             ctx_.backend.configure(ctx_.settings.get("server_url"), t->token);
         } else if (std::holds_alternative<cmd::SetupFinish>(c)) {

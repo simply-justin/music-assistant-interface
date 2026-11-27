@@ -208,6 +208,23 @@ TEST(test_ma_session) {
     CHECK(old.connection() == backend::Connection::IncompatibleServer);
 }
 
+TEST(an_unanswered_request_times_out) {
+    ma::Session s([](const std::string&) { return true; }, "secret");
+    s.on_open();
+    s.on_text(R"({"server_id":"x","server_version":"2.10.13","schema_version":65})");
+    s.on_text(R"({"message_id":"1","result":{}})");  // auth ok
+    std::string err;
+    s.tick(1000);
+    s.request(ma::cmd::players_all(), [&](backend::Response&& r) { err = r.error_code; });
+    s.tick(1000 + ma::Session::kTimeoutMs - 1);
+    CHECK(err.empty());
+    s.on_text(R"({"message_id":"2","result":[1],"partial":true})");  // still arriving: alive again
+    s.tick(1000 + ma::Session::kTimeoutMs + 10);
+    CHECK(err.empty());
+    s.tick(1000 + 2 * ma::Session::kTimeoutMs);
+    CHECK(err == "timeout");
+}
+
 TEST(test_parse) {
     backend::Json j(cJSON_Parse(R"({"media_type":"track","item_id":5,"provider":"library","name":"Yellow","uri":"library://track/5",
       "duration":269,"favorite":true,"external_ids":[["isrc","GBAYE0000267"]],

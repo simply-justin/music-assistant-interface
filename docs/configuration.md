@@ -41,6 +41,7 @@ Under **Music panel**:
 | Backend | Music Assistant · Mock (no server needed) | Music Assistant |
 | Screen orientation | Landscape, rotated 270° · rotated 90° | 270° (upright on the Waveshare board) |
 | Time zone | A POSIX TZ string, for the clock and the night schedule | `CET-1CEST,M3.5.0,M10.5.0/3` (Amsterdam) |
+| Firmware update URL | Where **Check for updates** reads the newest firmware (HTTPS) | This repository's latest release, `music_panel.bin` |
 | Music Assistant WebSocket URL (development only) | `ws://…/ws`, or empty | *(empty)* |
 | Music Assistant token | A long-lived token, or empty | *(empty)* |
 
@@ -49,6 +50,12 @@ Leave the URL empty on a real device: the panel then starts with first-time setu
 ### Board settings
 
 `sdkconfig.defaults` selects the Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1: the 10.1" JD9365 panel in RGB565, PSRAM, 16 MB flash and Wi-Fi through the ESP32-C6 over SDIO. `partitions.csv` splits the flash into two 6 MB app slots for over-the-air updates, NVS for settings and 1 MB of storage.
+
+### Releasing an update
+
+Push a version tag, for example `git tag v0.3.0 && git push origin v0.3.0`. `.github/workflows/release.yml` builds the firmware and publishes `music_panel.bin` as a GitHub release; panels find it under **Settings › About › Check for updates**. The panel compares the release's version with its own (`git describe` at build time) and offers any version that differs.
+
+The bootloader has rollback enabled: a new version must run for a minute before it confirms itself, otherwise the next start goes back to the previous one. Rollback needs the bootloader built with this setting, so a panel flashed before it was added needs one full `idf.py flash` over USB.
 
 ## Stored settings
 
@@ -66,3 +73,4 @@ The panel keeps its settings in NVS on the device, and in memory in the simulato
 | `brightness`, `dim_after`, `clock_dimmed` | Daytime screen settings |
 | `night`, `night_from`, `night_to`, `night_brightness` | Night schedule |
 | `diag_fps`, `diag_touches` | Diagnostics overlays |
+| `recent_searches` | The last eight searches, newest first, one per line |

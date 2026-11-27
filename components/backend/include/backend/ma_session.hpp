@@ -33,6 +33,10 @@ public:
     void on_text(std::string_view text);
     void on_open();
     void on_closed();  // fails every pending request with error_code "disconnected"
+    // Fails requests unanswered after kTimeoutMs with error_code "timeout": a lost reply must
+    // not leave a screen loading forever.
+    void tick(uint32_t now_ms);
+    static constexpr uint32_t kTimeoutMs = 30'000;  // a full search on a slow provider takes ~10 s
     void set_token(std::string token) { token_ = std::move(token); }
     void set_expected_server_id(std::string id) { expected_server_id_ = std::move(id); }
 
@@ -43,6 +47,7 @@ private:
     struct Pending {
         backend::Backend::Done done;
         backend::Json partial;  // joined chunks of a partial result
+        uint32_t sent_ms = 0;   // reset by each partial chunk: a long list still arriving is alive
     };
 
     void set_connection(backend::Connection c);
@@ -59,6 +64,7 @@ private:
     // Requests made after the socket opened but before auth finished; sent once connected.
     std::deque<std::pair<backend::Request, backend::Backend::Done>> waiting_;
     uint32_t next_id_ = 1;
+    uint32_t now_ms_ = 0;
     backend::Connection connection_ = backend::Connection::Disconnected;
     backend::ServerInfo info_;
 };

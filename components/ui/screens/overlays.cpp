@@ -236,7 +236,7 @@ void open_volume() {
     if (!p) return;
     lv_obj_t* s = kit::sheet(760);
     sheet_header(s, p->name);
-    bool group = !p->group_members.empty();
+    bool group = p->group_members.size() > 1;  // MA may list a lone speaker as its own one-member group
     volume_row(s, "", p->player_id, group ? p->group_volume : p->volume_level, group);
     if (group && state().players) {
         kit::overline(s, tr(i18n::Str::volume_each_speaker));
@@ -245,8 +245,15 @@ void open_volume() {
                 if (m.player_id == member_id) volume_row(s, m.name, m.player_id, m.volume_level, false);
     }
     kit::text(s, tr(group ? i18n::Str::volume_hint : i18n::Str::volume_hint_single), theme::meta(), theme::text3());
-    // Closes itself 4 s after opening (shortcut: not yet reset by touches inside the sheet).
-    lv_obj_delete_delayed(lv_obj_get_parent(s), 4000);
+    // Closes itself once nobody has touched the screen for 4 s (a slider being dragged counts).
+    lv_timer_t* t = lv_timer_create([](lv_timer_t* timer) {
+        if (lv_display_get_inactive_time(nullptr) < 4000) return;
+        lv_timer_pause(timer);  // the sheet's DELETE handler below deletes it
+        lv_obj_delete_async(static_cast<lv_obj_t*>(lv_timer_get_user_data(timer)));
+    }, 250, lv_obj_get_parent(s));
+    lv_obj_add_event_cb(lv_obj_get_parent(s), [](lv_event_t* e) {
+        if (auto* timer = static_cast<lv_timer_t*>(lv_event_get_user_data(e))) lv_timer_delete(timer);
+    }, LV_EVENT_DELETE, t);
 }
 
 void open_track_menu(const core::MediaItem& item) {
@@ -272,10 +279,16 @@ void open_track_menu(const core::MediaItem& item) {
     }
     if (item.type == core::MediaType::Track)
         menu_row(actions, icon::playlist_add, tr(i18n::Str::menu_add_to_playlist), [it] { open_add_to_playlist(it); });
-    menu_row(actions, it.favorite ? icon::heart_filled : icon::heart,
-             tr(it.favorite ? i18n::Str::menu_remove_favourite : i18n::Str::menu_add_favourite), [it] {
-                 send(app::cmd::SetFavourite{it, !it.favorite});
+    if (item.type == core::MediaType::Track)
+        menu_row(actions, icon::radio, tr(i18n::Str::menu_start_radio), [it] {
+            play(it, std::nullopt, true);
+            kit::close_sheets();
+        });
+    bool fav = state().favourite(it);
+    menu_row(actions, fav ? icon::heart_filled : icon::heart,
+             tr(fav ? i18n::Str::menu_remove_favourite : i18n::Str::menu_add_favourite), [it, fav] {
                  kit::close_sheets();
+                 set_favourite(it, !fav);
              });
     if (item.album) {
         core::MediaItem album;
@@ -363,8 +376,8 @@ void open_favourite_preview(const core::MediaItem& item) {
     if (item.type == core::MediaType::Album || item.type == core::MediaType::Playlist || item.type == core::MediaType::Artist)
         menu_row(actions, icon::chevron_right, tr(i18n::Str::preview_open), [it] { open_detail(it); });
     menu_row(actions, icon::heart_filled, tr(i18n::Str::menu_remove_favourite), [it] {
-        send(app::cmd::SetFavourite{it, false});
         kit::close_sheets();
+        set_favourite(it, false);
     });
 }
 

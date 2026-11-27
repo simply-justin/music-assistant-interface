@@ -34,6 +34,24 @@ struct Toast {
 
 struct LanguageChanged { i18n::Lang lang; };
 
+// The playing song's position, every second: apart from QueueState so the whole queue is not
+// copied (and compared by the UI) just because the clock moved.
+struct QueueTime {
+    std::string queue_id;
+    uint32_t elapsed_s = 0;
+};
+
+struct SleepTimerView { int minutes_left = 0; };  // 0 = off
+
+struct RecentSearches { std::vector<std::string> queries; };  // newest first
+
+enum class UpdateState : uint8_t { Idle, Checking, UpToDate, Available, Installing, Failed, NoNetwork };
+struct UpdateView {
+    UpdateState state = UpdateState::Idle;
+    std::string version;  // the newer version, when Available
+    int percent = 0;      // while Installing
+};
+
 struct BrowseView {
     cmd::BrowseKind kind;
     std::string of_uri;  // which album/artist/playlist, empty for library lists
@@ -52,8 +70,10 @@ struct SetupView {
     bool searching = false;
     std::string address;                 // server being checked / chosen
     bool checking = false, server_error = false;
+    bool server_too_old = false;         // it answered, but its API is older than this panel needs
     std::string pairing_url;
     bool token_error = false;
+    bool token_no_answer = false;        // the check got no answer (timeout or connection lost)
 };
 
 struct Provider {
@@ -82,6 +102,6 @@ using Update = std::variant<ConnectionView, std::shared_ptr<const core::SearchVi
                             std::shared_ptr<const core::QueueState>, std::shared_ptr<const PlaylistsView>,
                             std::shared_ptr<const BrowseView>, std::shared_ptr<const SetupView>,
                             std::shared_ptr<const PanelView>, Toast,
-                            LanguageChanged>;
+                            LanguageChanged, QueueTime, SleepTimerView, RecentSearches, UpdateView>;
 
 }  // namespace app

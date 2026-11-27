@@ -21,6 +21,7 @@ public:
         editing_ = false;
         const auto& item = detail_item();
         send(app::cmd::Browse{kind(item), item});
+        if (item.type == core::MediaType::Artist) send(app::cmd::Browse{Kind::ArtistAlbums, item});
     }
 
     void refresh(Topic t) override {
@@ -41,8 +42,12 @@ private:
     }
 
     void rebuild() {
-        lv_obj_clean(root_);
         const core::MediaItem item = detail_item();
+        // A rebuild for the same item (the song changed, a list refreshed) keeps the list where it was.
+        int32_t keep_y = list_ && shown_uri_ == item.uri ? lv_obj_get_scroll_y(list_) : 0;
+        list_ = nullptr;
+        shown_uri_ = item.uri;
+        lv_obj_clean(root_);
         const auto* list = state().list(kind(item), item.uri);
         std::vector<core::MediaItem> tracks = list ? list->items : std::vector<core::MediaItem>{};
         uint32_t total = 0;
@@ -93,15 +98,33 @@ private:
                 send(app::cmd::SetShuffle{true});
                 play(item);
             });
-            kit::icon_button(actions, item.favorite ? icon::heart_filled : icon::heart,
-                             [item] { send(app::cmd::SetFavourite{item, !item.favorite}); }, 56, 28, true,
-                             item.favorite ? theme::accent() : theme::text());
+            bool fav = state().favourite(item);
+            kit::icon_button(actions, fav ? icon::heart_filled : icon::heart, [item, fav] { set_favourite(item, !fav); }, 56,
+                             28, true, fav ? theme::accent() : theme::text());
             kit::spacer(actions);
             if (item.type == core::MediaType::Playlist && item.editable) {
                 kit::chip(actions, icon::edit, tr(i18n::Str::detail_edit), false, [this] {
                     editing_ = true;
                     kit::later([this] { rebuild(); });
                 });
+            }
+        }
+
+        // An artist: their albums as a row of covers above the songs.
+        if (item.type == core::MediaType::Artist) {
+            const auto* albums = state().list(Kind::ArtistAlbums, item.uri);
+            if (albums && !albums->items.empty()) {
+                kit::text(right, tr(i18n::Str::detail_albums), theme::lead(), theme::text());
+                lv_obj_t* shelf = kit::row(right, 16);
+                lv_obj_set_width(shelf, lv_pct(100));
+                lv_obj_set_flex_align(shelf, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+                lv_obj_add_flag(shelf, LV_OBJ_FLAG_SCROLLABLE);
+                lv_obj_set_scroll_dir(shelf, LV_DIR_HOR);
+                lv_obj_set_scrollbar_mode(shelf, LV_SCROLLBAR_MODE_OFF);
+                for (size_t i = 0; i < albums->items.size() && i < 24; ++i) {  // a row, not a catalogue
+                    const auto& a = albums->items[i];
+                    kit::media_card(shelf, a, kit::subtitle(a), [a] { open_detail(a); }, 112);
+                }
             }
         }
 
@@ -113,7 +136,10 @@ private:
         std::string now_uri = now ? now->uri : "";
         auto shared = std::make_shared<std::vector<core::MediaItem>>(std::move(tracks));
         bool editing = editing_;
-        kit::virtual_list(right, shared->size(), 64, 2, [shared, now_uri, editing, item](lv_obj_t* parent, size_t i) {
+        // Albums and playlists play on from the tapped song; an artist's song list is no real list.
+        std::optional<core::MediaItem> context;
+        if (item.type == core::MediaType::Album || item.type == core::MediaType::Playlist) context = item;
+        list_ = kit::virtual_list(right, shared->size(), 64, 2, [shared, now_uri, editing, item, context](lv_obj_t* parent, size_t i) {
             const auto& t = (*shared)[i];
             kit::RowOptions o;
             o.height = 64;
@@ -122,14 +148,20 @@ private:
                 int pos = static_cast<int>(i);  // 0-based list index; ma_commands converts for the server
                 o.on_remove = [item, pos] { send(app::cmd::RemoveFromPlaylist{item, pos}); };
             } else {
-                o.on_tap = [t] { play(t); };
+                o.on_tap = [t, context] { play(t, context); };
                 o.on_more = [t] { open_track_menu(t); };
             }
             return kit::media_row(parent, t, o);
         });
+        if (keep_y > 0) {
+            lv_obj_update_layout(list_);
+            lv_obj_scroll_to_y(list_, keep_y, LV_ANIM_OFF);
+        }
     }
 
     lv_obj_t* root_ = nullptr;
+    lv_obj_t* list_ = nullptr;  // the song list, to keep its scroll position across rebuilds
+    std::string shown_uri_;
     bool editing_ = false;
 };
 

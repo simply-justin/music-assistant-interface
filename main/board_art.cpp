@@ -31,23 +31,49 @@ SemaphoreHandle_t g_wake;
 jpeg_decoder_handle_t g_decoder;
 std::mutex g_decoder_mu;  // one hardware engine: decodes take turns
 
+// One HTTP client per worker, kept open between images: the covers all come from the same
+// server, so keep-alive saves a TCP handshake per image.
+struct Client {
+    esp_http_client_handle_t h = nullptr;
+    ~Client() { reset(); }
+    void reset() {
+        if (h) esp_http_client_cleanup(h);
+        h = nullptr;
+    }
+    bool open(const std::string& url) {
+        if (h && esp_http_client_set_url(h, url.c_str()) != ESP_OK) reset();
+        if (!h) {
+            esp_http_client_config_t c{};
+            c.url = url.c_str();
+            c.timeout_ms = 5000;
+            c.buffer_size = 4096;
+            c.keep_alive_enable = true;
+            h = esp_http_client_init(&c);
+            if (!h) return false;
+        }
+        if (esp_http_client_open(h, 0) != ESP_OK) {
+            reset();  // a dropped keep-alive connection: one fresh try
+            return false;
+        }
+        return true;
+    }
+};
+
 // Fetches the body into a buffer the JPEG engine can read (DMA-capable, aligned).
-uint8_t* fetch(const std::string& url, size_t& size) {
-    esp_http_client_config_t c{};
-    c.url = url.c_str();
-    c.timeout_ms = 5000;
-    c.buffer_size = 4096;
-    esp_http_client_handle_t h = esp_http_client_init(&c);
-    if (!h) return nullptr;
+uint8_t* fetch(Client& client, const std::string& url, size_t& size) {
+    if (!client.open(url) && !client.open(url)) return nullptr;
+    esp_http_client_handle_t h = client.h;
+    int64_t length = esp_http_client_fetch_headers(h);
+    bool ok = length >= 0 && esp_http_client_get_status_code(h) == 200;
     std::vector<uint8_t> body;
-    bool ok = esp_http_client_open(h, 0) == ESP_OK && esp_http_client_fetch_headers(h) >= 0 &&
-              esp_http_client_get_status_code(h) == 200;
+    if (ok && length > 0 && static_cast<size_t>(length) <= kMaxJpeg) body.reserve(static_cast<size_t>(length));
     std::vector<uint8_t> buf(4096);  // on the heap: the task stack also carries esp_http_client
     for (int n; ok && (n = esp_http_client_read(h, reinterpret_cast<char*>(buf.data()), static_cast<int>(buf.size()))) > 0;) {
         if (body.size() + static_cast<size_t>(n) > kMaxJpeg) ok = false;
         else body.insert(body.end(), buf.begin(), buf.begin() + n);
     }
-    esp_http_client_cleanup(h);
+    if (!ok || !esp_http_client_is_complete_data_received(h)) client.reset();  // don't reuse a half-read connection
+    else esp_http_client_close(h);  // keeps the connection for the next image when the server allows it
     if (!ok || body.empty()) return nullptr;
     jpeg_decode_memory_alloc_cfg_t in{};
     in.buffer_direction = JPEG_DEC_ALLOC_INPUT_BUFFER;
@@ -59,9 +85,10 @@ uint8_t* fetch(const std::string& url, size_t& size) {
     return out;
 }
 
-std::shared_ptr<img::Bitmap> fetch_and_decode(const ui::ArtRequest& r) {
+std::shared_ptr<img::Bitmap> fetch_and_decode(Client& client, const ui::ArtRequest& r) {
+    if (r.wanted && *r.wanted <= 0) return nullptr;  // scrolled away while it waited its turn
     size_t size = 0;
-    uint8_t* jpeg = fetch(r.url, size);
+    uint8_t* jpeg = fetch(client, r.url, size);
     if (!jpeg) return nullptr;
     std::shared_ptr<img::Bitmap> bitmap;
     jpeg_decode_picture_info_t info{};
@@ -99,6 +126,7 @@ std::shared_ptr<img::Bitmap> fetch_and_decode(const ui::ArtRequest& r) {
 }
 
 void worker(void*) {
+    Client client;
     for (;;) {
         xSemaphoreTake(g_wake, portMAX_DELAY);
         for (;;) {
@@ -109,7 +137,7 @@ void worker(void*) {
                 job = std::move(g_todo.front());
                 g_todo.pop_front();
             }
-            job.result = fetch_and_decode(job.req);
+            job.result = fetch_and_decode(client, job.req);
             std::lock_guard<std::mutex> l(g_mu);
             g_finished.push_back(std::move(job));
         }
@@ -124,7 +152,8 @@ void art_start() {
     ESP_ERROR_CHECK(jpeg_new_decoder_engine(&eng, &g_decoder));
     g_wake = xSemaphoreCreateCounting(64, 0);
     // 12 KB: esp_http_client and its logging need more than 6 KB (overflowed on the device).
-    for (int i = 0; i < 2; ++i) xTaskCreate(worker, "art", 12 * 1024, nullptr, 3, nullptr);
+    // Three: downloads overlap (the network is the slow part); decodes take turns on the one engine.
+    for (int i = 0; i < 3; ++i) xTaskCreate(worker, "art", 12 * 1024, nullptr, 3, nullptr);
 }
 
 void art_load(ui::ArtRequest req, std::function<void(std::shared_ptr<img::Bitmap>)> done) {

@@ -17,6 +17,7 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -38,9 +39,13 @@ QueueHandle_t g_updates;  // app::Update*: drained by the UI
 
 uint32_t now_ms() { return static_cast<uint32_t>(esp_timer_get_time() / 1000); }
 
+// A full queue waits instead of dropping: a lost job is a lost server reply or tap. Bounded, so
+// the core and UI tasks waiting on each other's full queue can never deadlock.
+constexpr TickType_t kQueueWait = pdMS_TO_TICKS(2000);
+
 void post_job(Job fn) {
     auto* job = new Job(std::move(fn));
-    if (xQueueSend(g_jobs, &job, pdMS_TO_TICKS(50)) != pdTRUE) {
+    if (xQueueSend(g_jobs, &job, kQueueWait) != pdTRUE) {
         ESP_LOGE(TAG, "core queue full, job dropped");
         delete job;
     }
@@ -48,8 +53,8 @@ void post_job(Job fn) {
 
 void publish(app::Update u) {
     auto* item = new app::Update(std::move(u));
-    if (xQueueSend(g_updates, &item, 0) != pdTRUE) {
-        ESP_LOGW(TAG, "UI queue full, update dropped");  // the next snapshot supersedes it
+    if (xQueueSend(g_updates, &item, kQueueWait) != pdTRUE) {
+        ESP_LOGW(TAG, "UI queue full, update dropped");
         delete item;
     }
 }
@@ -67,8 +72,13 @@ public:
         return v;
     }
     void set(const std::string& key, const std::string& value) override {
-        if (nvs_set_str(h_, key.c_str(), value.c_str()) == ESP_OK) nvs_commit(h_);
+        if (nvs_set_str(h_, key.c_str(), value.c_str()) == ESP_OK) dirty_ = true;
         else ESP_LOGE(TAG, "could not save setting %s", key.c_str());
+    }
+    // One flash commit per core job, not per key (one display change sets seven keys).
+    void flush() {
+        if (dirty_) nvs_commit(h_);
+        dirty_ = false;
     }
     void erase_all() override {
         nvs_erase_all(h_);
@@ -77,6 +87,7 @@ public:
 
 private:
     nvs_handle_t h_{};
+    bool dirty_ = false;
 };
 
 std::atomic<app::App*> g_app{nullptr};  // set by the core task once the App exists; used only there
@@ -105,8 +116,10 @@ void core_task(void*) {
             (*job)();
             delete job;
             app.tick(now_ms());
+            settings.flush();
         }
         app.tick(now_ms());
+        settings.flush();
     }
 }
 
@@ -116,6 +129,13 @@ void drain_updates(lv_timer_t*) {
     // and writes a core dump with every task's stack (a hung screen is otherwise silent).
     static bool watched = esp_task_wdt_add(nullptr) == ESP_OK;
     if (watched) esp_task_wdt_reset();
+    // After an update: a minute of the UI running is proof enough; otherwise the bootloader goes
+    // back to the previous version on the next start.
+    static bool confirmed = false;
+    if (!confirmed && esp_timer_get_time() > 60'000'000) {
+        confirmed = true;
+        esp_ota_mark_app_valid_cancel_rollback();
+    }
     app::Update* u = nullptr;
     while (xQueueReceive(g_updates, &u, 0) == pdTRUE) {
         ui::apply(std::move(*u));
@@ -181,8 +201,8 @@ extern "C" void app_main() {
     }
     ESP_ERROR_CHECK(err);
 
-    g_jobs = xQueueCreate(32, sizeof(Job*));
-    g_updates = xQueueCreate(32, sizeof(app::Update*));
+    g_jobs = xQueueCreate(64, sizeof(Job*));
+    g_updates = xQueueCreate(64, sizeof(app::Update*));
     xTaskCreate(core_task, "core", 12 * 1024, nullptr, 5, nullptr);
     while (!g_app) vTaskDelay(pdMS_TO_TICKS(5));  // the UI's first screen already sends commands
     start_ui();

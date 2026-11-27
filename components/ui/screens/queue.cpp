@@ -1,5 +1,5 @@
-// Queue: now playing on the left, "Up next" on the right. Tap plays, × removes, long-press offers
-// Play next / Move up / Move down (no drag: expensive in a recycled LVGL list).
+// Queue: now playing on the left, "Up next" on the right. Tap plays, × removes, the handle drags a
+// song to another place, long-press offers Play next / Move up / Move down.
 #include <algorithm>
 #include <map>
 
@@ -52,6 +52,8 @@ private:
     }
 
     void build_right() {
+        int32_t keep_y = list_ ? lv_obj_get_scroll_y(list_) : 0;  // a queue update must not jump to the top
+        list_ = nullptr;
         lv_obj_clean(right_);
         const core::QueueState* q = state().queue.get();
         size_t first = q && q->current_index >= 0 ? static_cast<size_t>(q->current_index) + 1 : 0;
@@ -93,23 +95,85 @@ private:
             banner(right_, i18n::tr(i18n::Str::queue_provider_down, kit::provider_name(worst->first)),
                    i18n::tr(i18n::Str::queue_provider_down_body, std::to_string(worst->second)));
         }
-        kit::virtual_list(right_, items->size(), 76, 4, [items](lv_obj_t* list, size_t n) {
+        list_ = kit::virtual_list(right_, items->size(), kRowH, kGap, [items](lv_obj_t* list, size_t n) {
             const core::QueueItem& qi = (*items)[n].second;
             core::MediaItem m = qi.media ? *qi.media : core::MediaItem{};
             if (!qi.media) m.name = qi.name;
             int index = (*items)[n].first;
             std::string id = qi.queue_item_id;
             kit::RowOptions o;
-            o.height = 76;
+            o.height = kRowH;
             o.on_tap = [index] { send(app::cmd::PlayQueueIndex{index}); };
             o.on_remove = [id] { send(app::cmd::RemoveFromQueue{id}); };
             lv_obj_t* r = kit::media_row(list, m, o);
             if (!qi.available) kit::tag(r, tr(i18n::Str::queue_unavailable), theme::warning());
             std::string name = m.name;
             kit::on_long_press(r, [id, name] { queue_item_menu(id, name); });
+            drag_handle(r, id, static_cast<int>(n), static_cast<int>(items->size()));
             return r;
         });
+        if (keep_y > 0) {
+            lv_obj_update_layout(list_);
+            lv_obj_scroll_to_y(list_, keep_y, LV_ANIM_OFF);
+        }
     }
+
+    // Drag: the row follows the finger; on release it moves by the rows it crossed. The handle
+    // neither scrolls nor hands the drag to the list, so the list stays still meanwhile.
+    struct Drag {
+        lv_obj_t* row = nullptr;
+        int32_t start_y = 0, row_y = 0;
+        std::string id;
+        int index = 0, count = 0;
+    };
+    static Drag& drag() {
+        static Drag d;
+        return d;
+    }
+
+    static void drag_handle(lv_obj_t* row, const std::string& id, int index, int count) {
+        lv_obj_t* h = kit::icon(row, icon::drag, 22, theme::text3());
+        lv_obj_add_flag(h, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(h, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(h, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+        lv_obj_remove_flag(h, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+        lv_obj_set_ext_click_area(h, 17);  // 22 + 2 × 17 = 56 px
+        auto* info = new Drag{row, 0, 0, id, index, count};
+        lv_obj_add_event_cb(h, [](lv_event_t* e) {
+            auto* info = static_cast<Drag*>(lv_event_get_user_data(e));
+            lv_event_code_t code = lv_event_get_code(e);
+            Drag& d = drag();
+            if (code == LV_EVENT_DELETE) {
+                if (d.row == info->row) d.row = nullptr;
+                delete info;
+                return;
+            }
+            lv_indev_t* indev = lv_indev_active();
+            if (!indev) return;
+            lv_point_t p;
+            lv_indev_get_point(indev, &p);
+            if (code == LV_EVENT_PRESSED) {
+                d = *info;
+                d.start_y = p.y;
+                d.row_y = lv_obj_get_y(info->row);
+                lv_obj_move_foreground(info->row);
+                lv_obj_set_style_bg_color(info->row, theme::elevated(), 0);
+                lv_obj_set_style_bg_opa(info->row, LV_OPA_COVER, 0);
+            } else if (code == LV_EVENT_PRESSING && d.row == info->row) {
+                lv_obj_set_y(d.row, d.row_y + p.y - d.start_y);
+            } else if ((code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) && d.row == info->row) {
+                int32_t dy = p.y - d.start_y;
+                int shift = static_cast<int>((dy + (dy >= 0 ? kPitch / 2 : -kPitch / 2)) / kPitch);
+                shift = std::clamp(shift, -d.index, d.count - 1 - d.index);  // stays within up next
+                lv_obj_set_y(d.row, d.row_y);
+                lv_obj_set_style_bg_opa(d.row, LV_OPA_TRANSP, 0);
+                d.row = nullptr;
+                if (shift) send(app::cmd::MoveInQueue{info->id, shift});
+            }
+        }, LV_EVENT_ALL, info);
+    }
+
+    static constexpr int32_t kRowH = 76, kGap = 4, kPitch = kRowH + kGap;
 
     // Long-press: Play next / Move up / Move down (instead of drag).
     static void queue_item_menu(const std::string& id, const std::string& name) {
@@ -130,6 +194,7 @@ private:
     }
 
     lv_obj_t *left_ = nullptr, *right_ = nullptr;
+    lv_obj_t* list_ = nullptr;
 };
 
 }  // namespace

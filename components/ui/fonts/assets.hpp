@@ -73,6 +73,7 @@ inline constexpr const char* language = "\xEE\x8A\x88";
 inline constexpr const char* backspace = "\xEE\x82\xAE";
 inline constexpr const char* shift = "\xEE\x94\xAE";
 inline constexpr const char* shift_on = "\xEF\xA3\xA6";
+inline constexpr const char* drag = "\xEE\xAB\xA2";
 }  // namespace icon
 
 }  // namespace ui

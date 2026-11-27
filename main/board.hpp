@@ -30,6 +30,8 @@ public:
     app::SystemInfo system_info() override;
     int local_minutes() override;
     void restart() override;
+    void update_check(std::function<void(std::string version, bool online)> done) override;
+    void update_install(std::function<void(int percent)> progress, std::function<void(bool ok)> done) override;
 
     struct State;  // event-handler state (board.cpp)
 

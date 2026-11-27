@@ -17,7 +17,12 @@ enum class PlayOption : uint8_t { Play, Replace, Next, ReplaceNext, Add };
 backend::Request search(const std::string& query, core::SearchStage stage, int limit_per_type);
 backend::Request library_items(core::MediaType type, bool favorite_only, int limit, int offset,
                                const char* order_by = "sort_name");
-backend::Request play_media(const std::string& queue_id, const std::vector<std::string>& uris, PlayOption option);
+// start_item: a song inside the album/playlist in `uris` to start at. radio_mode: endless similar songs.
+backend::Request play_media(const std::string& queue_id, const std::vector<std::string>& uris, PlayOption option,
+                            const std::string& start_item = "", bool radio_mode = false);
+backend::Request transfer(const std::string& from_queue_id, const std::string& to_queue_id);
+backend::Request pause(const std::string& queue_id);
+backend::Request get_library_item(const core::MediaItem& provider_item);  // its library copy, or null
 backend::Request play_pause(const std::string& queue_id);
 backend::Request stop(const std::string& queue_id);
 backend::Request next(const std::string& queue_id);

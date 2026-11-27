@@ -297,3 +297,26 @@ spk_edit_group,Change group,Groep aanpassen
 spk_group_sub,Same music as {} in other rooms,Dezelfde muziek als {} in andere kamers
 bar_idle_sub,Choose something to play,Kies iets om af te spelen
 conn_status,Status,Status
+toast_move_music,Move the music to {}?,De muziek naar {} verplaatsen?
+toast_move,Move,Verplaatsen
+toast_favourite_failed,Couldn't remove it from favourites,Kon het niet uit favorieten verwijderen
+setup_server_old,This Music Assistant is too old for this panel. Update it and try again.,Deze Music Assistant is te oud voor dit scherm. Werk hem bij en probeer opnieuw.
+setup_signin_no_answer,Music Assistant didn't answer. Try again.,Music Assistant reageerde niet. Probeer opnieuw.
+menu_start_radio,Start radio from this song,Radio starten vanaf dit nummer
+sleep_title,Sleep timer,Slaaptimer
+sleep_off,Off,Uit
+sleep_minutes,{} min,{} min
+sleep_active,Stops in {} min,Stopt over {} min
+toast_sleep_set,Music stops in {} minutes,De muziek stopt over {} minuten
+toast_sleep_off,Sleep timer off,Slaaptimer uit
+search_recent,Recent searches,Recente zoekopdrachten
+detail_albums,Albums,Albums
+ota_title,Software update,Software-update
+ota_check,Check for updates,Controleren op updates
+ota_checking,Checking for updates…,Controleren op updates…
+ota_up_to_date,This is the latest version,Dit is de nieuwste versie
+ota_available,Version {} is available,Versie {} is beschikbaar
+ota_install,Install and restart,Installeren en herstarten
+ota_installing,Installing… {}%,Installeren… {}%
+ota_failed,The update didn't work. The panel keeps its current version.,De update lukte niet. Het scherm houdt de huidige versie.
+ota_no_network,No internet connection,Geen internetverbinding

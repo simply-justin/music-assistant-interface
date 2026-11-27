@@ -29,7 +29,13 @@ struct Shell {
     lv_obj_t* ambient = nullptr;
     lv_obj_t* ambient_clock = nullptr;
     bool touches_hooked = false;
+    std::string players_sig, queue_sig;  // signature() of the shown snapshot, kept to compare once
+    std::string bar_key;                 // what the player bar was last built from
+    std::deque<std::string> detail_keys; // album/artist/playlist lists kept, oldest first
 };
+
+// Album, artist and playlist lists kept for going back; library lists are always kept.
+constexpr size_t kKeptDetailLists = 8;
 
 Shell& shell() {
     static Shell s;
@@ -167,10 +173,24 @@ void build_sidebar() {
     side_item(s.side, icon::settings, tr(i18n::Str::nav_settings), tab == ScreenId::Settings, [] { open(ScreenId::Settings); });
 }
 
+// Everything the player bar shows except the clock: equal keys = nothing to redraw.
+std::string bar_key() {
+    const State& st = shell().state;
+    auto item = st.now_playing();
+    const core::PlayerState* p = st.selected();
+    const core::QueueState* q = st.queue.get();
+    std::string k = item ? item->uri + '|' + item->name + '|' + kit::subtitle(*item) + '|' + std::to_string(item->duration_s) : "-";
+    k += st.playing() ? "|P" : "|-";
+    if (p) k += '|' + p->player_id + '|' + std::to_string(p->volume_level) + (p->can_set_volume ? "v" : "");
+    if (q) k += std::string(q->shuffle ? "|s" : "|") + std::to_string(static_cast<int>(q->repeat));
+    return k;
+}
+
 // Player bar (96 px, full width): what's playing | transport + progress | queue, volume.
 void refresh_bar() {
     auto& s = shell();
     if (!s.bar || lv_obj_has_flag(s.bar, LV_OBJ_FLAG_HIDDEN)) return;
+    s.bar_key = bar_key();
     lv_obj_clean(s.bar);
     s.progress = s.elapsed = nullptr;
     auto item = s.state.now_playing();
@@ -234,7 +254,7 @@ void refresh_bar() {
             lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
         }
         lv_obj_t* prog = kit::row(mid, 10);
-        lv_obj_set_width(prog, 480);
+        lv_obj_set_size(prog, 480, 26);  // same height as when playing: nothing jumps when music starts
         lv_obj_set_style_opa(prog, LV_OPA_40, 0);
         kit::text(prog, "0:00", theme::label(), theme::text3());
         lv_obj_t* track = kit::row(prog, 0);
@@ -247,16 +267,20 @@ void refresh_bar() {
     }
     if (item && !radio && item->duration_s) {
         lv_obj_t* prog = kit::row(mid, 10);
-        lv_obj_set_width(prog, 480);
+        lv_obj_set_size(prog, 480, 26);  // as tall as the pressed knob, so the column doesn't clip it
         s.elapsed = kit::text(prog, duration(s.state.elapsed_s), theme::label(), theme::text3());
-        s.progress = lv_bar_create(prog);
+        // Drag to seek: the position is sent when the finger lifts.
+        s.progress = kit::slider(prog, 0, [](int v) {
+            shell().state.elapsed_s = static_cast<uint32_t>(v);
+            send(app::cmd::Seek{v});
+        }, theme::text());
         lv_obj_set_flex_grow(s.progress, 1);
-        lv_obj_set_height(s.progress, 4);
-        lv_obj_set_style_bg_color(s.progress, theme::elevated(), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(s.progress, theme::text(), LV_PART_INDICATOR);
+        // The knob (20 px, 26 px pressed) sticks out past both ends: room so it never covers the times.
+        lv_obj_set_style_margin_left(s.progress, 14, 0);
+        lv_obj_set_style_margin_right(s.progress, 14, 0);
         lv_obj_set_style_anim_duration(s.progress, 1000, 0);  // glides between the 1 Hz ticks
-        lv_bar_set_range(s.progress, 0, static_cast<int32_t>(item->duration_s));
-        lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_OFF);
+        lv_slider_set_range(s.progress, 0, static_cast<int32_t>(item->duration_s));
+        lv_slider_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_OFF);
         kit::text(prog, duration(item->duration_s), theme::label(), theme::text3());
     }
 
@@ -350,6 +374,15 @@ std::string signature(const core::QueueState& q) {
     return k;
 }
 
+// The clock moved (from the server or the local 1 Hz tick): progress only, never a rebuild.
+void show_elapsed() {
+    auto& s = shell();
+    screen(s.current).refresh(Topic::Progress);
+    bool dragging = s.progress && lv_obj_has_state(s.progress, LV_STATE_PRESSED);  // the finger owns it
+    if (s.progress && !dragging) lv_slider_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_ON);
+    if (s.elapsed) lv_label_set_text(s.elapsed, duration(s.state.elapsed_s).c_str());
+}
+
 void tick_progress(lv_timer_t*) {
     auto& s = shell();
     tick_ambient();
@@ -360,9 +393,7 @@ void tick_progress(lv_timer_t*) {
     if (s.state.pending) return;  // don't run the clock before the song has started
     if (!s.state.playing()) return;
     ++s.state.elapsed_s;
-    screen(s.current).refresh(Topic::Progress);
-    if (s.progress) lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_ON);
-    if (s.elapsed) lv_label_set_text(s.elapsed, duration(s.state.elapsed_s).c_str());
+    show_elapsed();
 }
 
 }  // namespace
@@ -641,7 +672,18 @@ void open_detail(const core::MediaItem& item) {
     open(ScreenId::Detail);
 }
 
-void play(const core::MediaItem& item) {
+bool State::favourite(const core::MediaItem& m) const {
+    auto it = favourite_override.find(m.uri);
+    return it == favourite_override.end() ? m.favorite : it->second;
+}
+
+void set_favourite(const core::MediaItem& item, bool on) {
+    shell().state.favourite_override[item.uri] = on;
+    send(app::cmd::SetFavourite{item, on});
+    kit::later([] { screen(shell().current).refresh(Topic::All); });  // repaint the heart
+}
+
+void play(const core::MediaItem& item, const std::optional<core::MediaItem>& context, bool radio) {
     // Songs and stations show in the player bar at once; albums and playlists wait for the queue
     // (the bar would otherwise show the album's name as if it were a song).
     if (item.type == core::MediaType::Track || item.type == core::MediaType::Radio) {
@@ -651,7 +693,7 @@ void play(const core::MediaItem& item) {
         s.state.elapsed_s = 0;
         refresh_bar();
     }
-    send(app::cmd::Play{item});
+    send(app::cmd::Play{item, context, radio});
 }
 
 std::string songs(size_t count) {
@@ -701,6 +743,7 @@ void apply(app::Update update) {
         topic = Topic::Connection;
         if (came_up) {
             s.state.ever_connected = true;
+            ++s.state.connected_epoch;
             if (s.current == ScreenId::Boot) return open(ScreenId::Home);
             screen(s.current).on_open();  // (re)connected: reload what the screen shows
         }
@@ -725,25 +768,37 @@ void apply(app::Update update) {
         if (s.current != ScreenId::Settings && s.current != ScreenId::Boot) return;
         topic = Topic::Panel;
     } else if (auto* p = std::get_if<std::shared_ptr<const app::PlayersView>>(&update)) {
-        bool same = s.state.players && signature(**p) == signature(*s.state.players);
+        std::string sig = signature(**p);
+        bool same = s.state.players && sig == s.players_sig;
         s.state.players = *p;
+        s.players_sig = std::move(sig);
         if (same) return;  // MA repeats player_updated (elapsed time, other fields we don't show)
         topic = Topic::Players;
     } else if (auto* q = std::get_if<std::shared_ptr<const core::QueueState>>(&update)) {
-        bool same = s.state.queue && signature(**q) == signature(*s.state.queue);
+        std::string sig = signature(**q);
+        bool same = s.state.queue && sig == s.queue_sig;
         s.state.queue = *q;
+        s.queue_sig = std::move(sig);
         if (s.state.pending) {  // the tapped song is now the queue's current one: stop pretending
             const auto& cur = (*q)->current;
             if (cur && cur->media && cur->media->uri == s.state.pending->uri) s.state.pending.reset();
         }
         s.state.elapsed_s = (*q)->elapsed_s;
-        if (same) {  // only the time moved: no rebuild (it reset scroll and re-faded every cover)
-            screen(s.current).refresh(Topic::Progress);
-            if (s.progress) lv_bar_set_value(s.progress, static_cast<int32_t>(s.state.elapsed_s), LV_ANIM_ON);
-            if (s.elapsed) lv_label_set_text(s.elapsed, duration(s.state.elapsed_s).c_str());
-            return;
-        }
+        if (same) return show_elapsed();  // only the time moved: no rebuild (it reset scroll and re-faded every cover)
         topic = Topic::Queue;
+    } else if (auto* t = std::get_if<app::QueueTime>(&update)) {
+        if (!s.state.queue || s.state.queue->queue_id != t->queue_id) return;
+        s.state.elapsed_s = t->elapsed_s;
+        return show_elapsed();
+    } else if (auto* st = std::get_if<app::SleepTimerView>(&update)) {
+        s.state.sleep_minutes = st->minutes_left;
+        topic = Topic::Sleep;
+    } else if (auto* rs = std::get_if<app::RecentSearches>(&update)) {
+        s.state.recent_searches = rs->queries;
+        topic = Topic::Search;
+    } else if (auto* uv = std::get_if<app::UpdateView>(&update)) {
+        s.state.update = *uv;
+        topic = Topic::Update;
     } else if (auto* sv = std::get_if<std::shared_ptr<const core::SearchView>>(&update)) {
         s.state.search = *sv;
         topic = Topic::Search;
@@ -751,7 +806,16 @@ void apply(app::Update update) {
         s.state.playlists = *pl;
         topic = Topic::Playlists;
     } else if (auto* b = std::get_if<std::shared_ptr<const app::BrowseView>>(&update)) {
-        s.state.lists[browse_key((*b)->kind, (*b)->of_uri)] = *b;
+        std::string key = browse_key((*b)->kind, (*b)->of_uri);
+        s.state.lists[key] = *b;
+        if (!(*b)->of_uri.empty()) {  // bounded: every album opened would otherwise stay in memory
+            s.detail_keys.erase(std::remove(s.detail_keys.begin(), s.detail_keys.end(), key), s.detail_keys.end());
+            s.detail_keys.push_back(key);
+            while (s.detail_keys.size() > kKeptDetailLists) {
+                s.state.lists.erase(s.detail_keys.front());
+                s.detail_keys.pop_front();
+            }
+        }
         topic = Topic::Browse;
     } else if (auto* t = std::get_if<app::Toast>(&update)) {
         auto action = t->action;
@@ -769,9 +833,12 @@ void apply(app::Update update) {
         lv_obj_update_layout(root);
         lv_obj_scroll_to_y(root, y, LV_ANIM_OFF);
     }
-    if (topic == Topic::Queue || topic == Topic::Players || topic == Topic::Playlists) {
-        build_sidebar();
-        refresh_bar();
+    // The sidebar shows only the playlists; the bar only what bar_key() covers. Rebuilding them for
+    // every speaker or queue update cost a full bar (cover included) several times a minute.
+    if (topic == Topic::Playlists) build_sidebar();
+    if (topic == Topic::Queue || topic == Topic::Players) {
+        std::string key = bar_key();
+        if (key != s.bar_key) refresh_bar();
     }
 }
 

@@ -67,14 +67,27 @@ Request library_items(core::MediaType type, bool favorite_only, int limit, int o
     return r;
 }
 
-Request play_media(const std::string& queue_id, const std::vector<std::string>& uris, PlayOption option) {
+Request play_media(const std::string& queue_id, const std::vector<std::string>& uris, PlayOption option,
+                   const std::string& start_item, bool radio_mode) {
     static const char* names[] = {"play", "replace", "next", "replace_next", "add"};
     Request r = on_queue("player_queues/play_media", queue_id);
     cJSON* media = cJSON_AddArrayToObject(r.args.get(), "media");
     for (const auto& u : uris) cJSON_AddItemToArray(media, cJSON_CreateString(u.c_str()));
     cJSON_AddStringToObject(r.args.get(), "option", names[static_cast<int>(option)]);
+    if (!start_item.empty()) cJSON_AddStringToObject(r.args.get(), "start_item", start_item.c_str());
+    if (radio_mode) cJSON_AddBoolToObject(r.args.get(), "radio_mode", true);
     return r;
 }
+
+Request transfer(const std::string& from_queue_id, const std::string& to_queue_id) {
+    Request r = make("player_queues/transfer");
+    cJSON_AddStringToObject(r.args.get(), "source_queue_id", from_queue_id.c_str());
+    cJSON_AddStringToObject(r.args.get(), "target_queue_id", to_queue_id.c_str());
+    cJSON_AddBoolToObject(r.args.get(), "auto_play", true);
+    return r;
+}
+
+Request pause(const std::string& q) { return on_queue("player_queues/pause", q); }
 
 Request play_pause(const std::string& q) { return on_queue("player_queues/play_pause", q); }
 Request stop(const std::string& q) { return on_queue("player_queues/stop", q); }
@@ -201,6 +214,12 @@ Request on_item(const char* command, const core::MediaItem& item) {
     return r;
 }
 }  // namespace
+
+Request get_library_item(const core::MediaItem& item) {
+    Request r = on_item("music/get_library_item", item);
+    cJSON_AddStringToObject(r.args.get(), "media_type", type_name(item.type));
+    return r;
+}
 
 Request recently_played(int limit) {
     Request r = make("music/recently_played_items");
