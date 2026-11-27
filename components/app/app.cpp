@@ -1,12 +1,17 @@
 #include "app/app.hpp"
 
+#include <cstdio>
+
 #include <sstream>
 
 namespace app {
 
 void Context::send(backend::Request req, std::function<void(backend::Response&&)> on_ok) {
-    backend.request(std::move(req), [this, on_ok = std::move(on_ok)](backend::Response&& r) {
+    std::string command = req.command;
+    backend.request(std::move(req), [this, command, on_ok = std::move(on_ok)](backend::Response&& r) {
         if (!r.ok) {
+            // The toast is generic; the log says what the server answered (serial log on the panel).
+            std::printf("command %s failed: %s %s\n", command.c_str(), r.error_code.c_str(), r.details.c_str());
             if (r.error_code != "disconnected")
                 publish(Toast{i18n::tr(i18n::Str::toast_command_failed), std::nullopt, {}, true});
             return;  // disconnects are shown by the connection banner instead

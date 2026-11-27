@@ -139,7 +139,11 @@ When the connection drops, the panel shows "Can't reach Music Assistant" with a 
 
 ## Known limitations
 
-- **Board support is partly verified.** On the Waveshare board (chip revision v3.2) the display, touch, rotation and the UI run. Wi-Fi needs the ESP32-C6 co-processor firmware updated: the factory firmware predates esp_hosted 3 and reports version 0.0.0. Discovery, the pairing page, artwork and the clock depend on Wi-Fi and are not verified yet.
-- **Rotation and touch.** The display adapter rotates the image in hardware (LVGL stays at 0°), so touch arrives in the panel's portrait coordinates and is swapped and mirrored by the GT911 driver; see `start_ui()` in `main/main.cpp`. 270° is upright.
+- **Board support runs on the device** (Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1, chip v3.2): display, touch, Wi-Fi, Music Assistant, setup with the phone pairing page, browsing, search and playback. Lessons that shaped the setup:
+  - **Wi-Fi driver versions** must match the ESP32-C6's factory co-processor firmware: esp_wifi_remote 0.14 / esp_hosted 1.4, as Waveshare's own examples. esp_hosted 3.x drops frames and times out against it.
+  - **Rotation** uses the PPA, which hangs on partial 270° rotations in ESP-IDF 5.5.6. `components/esp_driver_ppa` is ESP-IDF's driver with Espressif's fix; remove it once ESP-IDF ships the fix.
+  - **Touch** arrives in the panel's portrait coordinates (the adapter rotates the image in hardware) and is swapped and mirrored in `start_ui()`.
+  - **Memory:** ordinary allocations and JSON go to PSRAM, so the internal RAM stays free for the Wi-Fi link's DMA buffers. The serial log prints a heap line every 30 s.
+  - **Diagnosis:** a hung screen trips the task watchdog after 5 s, which writes a core dump to the serial log (`python -m esp_coredump info_corefile -t b64 -c <dump> build/music_panel.elf`).
 - **Playback errors** appear only when Music Assistant marks the current queue item as unavailable. A richer error signal is an open question.
 - Wi-Fi via the ESP32-C6, PSRAM, flash size, the partition layout and the chip revision will follow Waveshare's reference examples.

@@ -1,5 +1,9 @@
 CONFIG_IDF_TARGET="esp32p4"
 CONFIG_FREERTOS_HZ=1000
+# A hung task (e.g. the screen) panics after 5 s and dumps every task's stack to the serial log.
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_COREDUMP_ENABLE_TO_UART=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 # Waveshare ESP32-P4-WIFI6-Touch-LCD-10.1. Boards ship with chip revision v3.x, which needs
 # ESP-IDF 5.5.3 or later and a build for v3 (firmware for v1.x chips does not boot on v3.x).
@@ -9,7 +13,12 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_USE_MALLOC=y
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+# Ordinary allocations go to PSRAM: library lists, strings and LVGL objects are thousands of small
+# blocks, and in internal RAM they starved the Wi-Fi link's DMA buffers (esp_hosted asserted at
+# 19 KB free). Drivers that need DMA memory ask for it explicitly; 64 KB stays reserved for them.
+# JSON also goes to PSRAM through the cJSON hooks in main.cpp.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
 # Wi-Fi through the ESP32-C6 over SDIO (esp_hosted 1.4 defaults match the board's wiring).
 CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
 # Display: 10.1" JD9365 panel, RGB565.

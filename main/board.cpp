@@ -378,6 +378,12 @@ void BoardPlatform::set_brightness(int percent) {
 }
 
 app::SystemInfo BoardPlatform::system_info() {
+    // Called every 30 s (Settings › About refresh): a cheap health line for the serial log.
+    ESP_LOGI(TAG, "heap: internal %u KB free (lowest %u KB), DMA %u KB, PSRAM %u KB",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL) / 1024),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL) / 1024),
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
     return {esp_app_get_description()->version, static_cast<uint32_t>(esp_timer_get_time() / 1000000),
             static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024),
             static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024)};

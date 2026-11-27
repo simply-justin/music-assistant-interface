@@ -24,6 +24,8 @@
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "cJSON.h"
+#include "esp_task_wdt.h"
 #include "sdkconfig.h"
 
 namespace {
@@ -110,6 +112,10 @@ void core_task(void*) {
 
 // GUI task (LVGL timer, lock held): hand every update and finished image to the UI.
 void drain_updates(lv_timer_t*) {
+    // The LVGL task is watched: if it stops running its timers for 5 s, the task watchdog panics
+    // and writes a core dump with every task's stack (a hung screen is otherwise silent).
+    static bool watched = esp_task_wdt_add(nullptr) == ESP_OK;
+    if (watched) esp_task_wdt_reset();
     app::Update* u = nullptr;
     while (xQueueReceive(g_updates, &u, 0) == pdTRUE) {
         ui::apply(std::move(*u));
@@ -158,7 +164,16 @@ void start_ui() {
 
 }  // namespace
 
+// Music Assistant replies become thousands of small cJSON nodes (a search is ~1 MB of JSON). In the
+// small internal RAM they starved the Wi-Fi link's DMA buffers; PSRAM has room.
+void* json_alloc(size_t size) {
+    void* p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : malloc(size);
+}
+
 extern "C" void app_main() {
+    cJSON_Hooks hooks{json_alloc, free};
+    cJSON_InitHooks(&hooks);
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
