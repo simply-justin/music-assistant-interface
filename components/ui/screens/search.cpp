@@ -68,7 +68,7 @@ public:
 
 private:
     void build_keyboard(lv_obj_t* root) {
-        kb_ = kit::keyboard(root, input_, tr(i18n::Str::key_delete), tr(i18n::Str::key_search), tr(i18n::Str::key_space),
+        kb_ = kit::keyboard(root, input_, tr(i18n::Str::key_search), tr(i18n::Str::key_space),
                             [this] { show_keyboard(false); });
         lv_obj_add_flag(kb_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_set_width(kb_, theme::kScreenW - theme::kSideW);

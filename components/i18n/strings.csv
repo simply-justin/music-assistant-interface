@@ -53,7 +53,6 @@ filter_albums,Albums,Albums
 filter_playlists,Playlists,Afspeellijsten
 filter_radio,Radio,Radio
 lib_favourites,Favourites,Favorieten
-key_delete,Delete,Wissen
 key_search,Search,Zoek
 key_space,space,spatie
 key_done,Done,Klaar

@@ -426,7 +426,7 @@ void open_new_playlist(std::optional<core::MediaItem> first_item) {
     lv_obj_set_flex_grow(go, 1);
 
     // Full-width keyboard along the bottom of the screen (same layer as the sheet).
-    lv_obj_t* kb = kit::keyboard(lv_obj_get_parent(s), ta, tr(i18n::Str::key_delete), tr(i18n::Str::key_done),
+    lv_obj_t* kb = kit::keyboard(lv_obj_get_parent(s), ta, tr(i18n::Str::key_done),
                                  tr(i18n::Str::key_space), {});
     lv_obj_add_flag(kb, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);

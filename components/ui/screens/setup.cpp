@@ -205,7 +205,7 @@ private:
             if (kb_) lv_obj_add_flag(kb_, LV_OBJ_FLAG_HIDDEN);
             if (!text.empty()) on_done(text);
         };
-        kb_ = kit::keyboard(root_, input_, tr(i18n::Str::key_delete), tr(done_key), tr(i18n::Str::key_space), finish);
+        kb_ = kit::keyboard(root_, input_, tr(done_key), tr(i18n::Str::key_space), finish);
         lv_obj_add_flag(kb_, LV_OBJ_FLAG_IGNORE_LAYOUT);
         lv_obj_align(kb_, LV_ALIGN_BOTTOM_MID, 0, 0);
         lv_obj_add_flag(kb_, LV_OBJ_FLAG_HIDDEN);

@@ -70,6 +70,9 @@ inline constexpr const char* playlist_add = "\xEE\x8B\xB8";
 inline constexpr const char* artist = "\xEE\x93\x82";
 inline constexpr const char* album = "\xEE\xB2\xAC";
 inline constexpr const char* language = "\xEE\x8A\x88";
+inline constexpr const char* backspace = "\xEE\x82\xAE";
+inline constexpr const char* shift = "\xEE\x94\xAE";
+inline constexpr const char* shift_on = "\xEF\xA3\xA6";
 }  // namespace icon
 
 }  // namespace ui

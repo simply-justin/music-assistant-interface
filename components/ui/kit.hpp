@@ -77,11 +77,9 @@ lv_obj_t* favourite_tile(lv_obj_t* parent, const core::MediaItem& item, Action o
 lv_obj_t* slider(lv_obj_t* parent, int value, std::function<void(int)> on_release, lv_color_t fill = theme::accent());
 lv_obj_t* toggle(lv_obj_t* parent, bool on, std::function<void(bool)> on_change);
 
-// On-screen keyboard (keys 60 px) typing into `input`. Special keys are words in the current
-// language, not symbol glyphs (the Inter fonts don't contain LVGL's symbols). `on_done`: the
-// confirm key. Labels: delete, done (e.g. "Search"), space.
-lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& del, const std::string& done,
-                   const std::string& space, Action on_done);
+// On-screen keyboard in the usual tablet layout, typing into `input`. `done` labels the action key
+// at the end of the home row (e.g. "Search", "Join"); `on_done` runs when it is pressed.
+lv_obj_t* keyboard(lv_obj_t* parent, lv_obj_t* input, const std::string& done, const std::string& space, Action on_done);
 
 // A sheet on the top layer: scrim + panel. Tapping the scrim closes it. Returns the panel.
 lv_obj_t* sheet(int32_t width, Action on_close = {});
