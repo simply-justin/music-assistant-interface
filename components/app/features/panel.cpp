@@ -9,7 +9,9 @@ namespace app {
 namespace {
 
 constexpr uint32_t kRefreshMs = 30'000;
-constexpr int kDimmedBrightness = 8;  // dimmed clock; the night brightness caps it further
+// The idle clock screen: dimmed but readable (8 % looked black on the 10.1" panel); the night
+// brightness caps it further.
+constexpr int kDimmedBrightness = 25;
 
 bool in_window(int now, int from, int to) { return from <= to ? now >= from && now < to : now >= from || now < to; }
 

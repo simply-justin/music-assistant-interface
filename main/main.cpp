@@ -139,7 +139,7 @@ void start_ui() {
         ESP_LOGE(TAG, "display did not start");
         return;
     }
-    bsp_display_backlight_on();
+    board::backlight_ready();  // the brightness the core already asked for (from settings)
     board::art_start();
     // Wait for the LVGL task to let go (the BSP passes this to esp_lv_adapter_lock, where -1 waits
     // forever and 0 does not wait at all). The UI must never be built without the lock.

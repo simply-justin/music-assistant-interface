@@ -193,7 +193,7 @@ TEST(test_panel_brightness) {
     a.handle(app::cmd::SetDisplay{d});
     CHECK(platform.brightness == 70 && settings.get("brightness") == "70");
     a.handle(app::cmd::SetDimmed{true});
-    CHECK(platform.brightness == 8);
+    CHECK(platform.brightness == 25);
     d.night = true;
     d.night_from = 0;
     d.night_to = 24 * 60;  // always night

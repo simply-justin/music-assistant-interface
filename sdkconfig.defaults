@@ -16,6 +16,8 @@ CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
 # Display: 10.1" JD9365 panel, RGB565.
 CONFIG_BSP_LCD_TYPE_800_1280_10_1_INCH=y
 CONFIG_BSP_LCD_COLOR_FORMAT_RGB565=y
+# A BSP call that fails returns an error instead of aborting the whole panel.
+# CONFIG_BSP_ERROR_CHECK is not set
 # The pairing page posts a token of up to ~4 KB form-encoded.
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 # LVGL extras used by the UI (same as test/sim/lv_conf.h)

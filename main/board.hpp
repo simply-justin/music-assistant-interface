@@ -11,6 +11,10 @@ namespace board {
 
 using Post = std::function<void(std::function<void()>)>;
 
+// The backlight PWM exists only once the display has started. Until then brightness requests are
+// remembered; backlight_ready() (called after bsp_display_start) applies the last one.
+void backlight_ready();
+
 class BoardPlatform : public app::Platform {
 public:
     explicit BoardPlatform(Post post);

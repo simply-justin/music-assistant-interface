@@ -359,7 +359,23 @@ void BoardPlatform::pairing_stop() {
     if (h) httpd_stop(h);
 }
 
-void BoardPlatform::set_brightness(int percent) { bsp_display_brightness_set(std::clamp(percent, 0, 100)); }
+namespace {
+std::mutex g_backlight_mu;
+bool g_backlight_up = false;
+int g_backlight_level = 80;  // last requested, applied once the display is up
+}  // namespace
+
+void backlight_ready() {
+    std::lock_guard<std::mutex> l(g_backlight_mu);
+    g_backlight_up = true;
+    bsp_display_brightness_set(g_backlight_level);
+}
+
+void BoardPlatform::set_brightness(int percent) {
+    std::lock_guard<std::mutex> l(g_backlight_mu);
+    g_backlight_level = std::clamp(percent, 0, 100);
+    if (g_backlight_up) bsp_display_brightness_set(g_backlight_level);  // before that the PWM does not exist yet
+}
 
 app::SystemInfo BoardPlatform::system_info() {
     return {esp_app_get_description()->version, static_cast<uint32_t>(esp_timer_get_time() / 1000000),
