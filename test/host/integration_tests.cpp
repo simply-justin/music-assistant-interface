@@ -400,4 +400,16 @@ TEST(playing_on_a_paused_speaker_stops_the_old_song_first) {
     CHECK(stop != p.mock.received.end() && play != p.mock.received.end() && stop < play);
 }
 
+TEST(a_radio_station_is_never_added_to_the_queue) {
+    Panel p;
+    MediaItem station;
+    station.type = MediaType::Radio;
+    station.name = "NPO Radio 2";
+    station.uri = "tunein://radio/s1";
+    p.mock.received.clear();
+    p.send(app::cmd::AddToQueue{station});
+    p.send(app::cmd::AddToQueue{station, true});
+    CHECK(std::count(p.mock.received.begin(), p.mock.received.end(), "player_queues/play_media") == 0);
+}
+
 int main() { return check::run_all("integration"); }

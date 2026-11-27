@@ -55,9 +55,14 @@ private:
         lv_obj_clean(right_);
         const core::QueueState* q = state().queue.get();
         size_t first = q && q->current_index >= 0 ? static_cast<size_t>(q->current_index) + 1 : 0;
-        size_t count = q && q->items.size() > first ? q->items.size() - first : 0;
+        // Up next lists songs only: a station MA left in the queue is not something to queue or skip to.
+        auto items = std::make_shared<std::vector<std::pair<int, core::QueueItem>>>();
+        for (size_t i = first; q && i < q->items.size(); ++i)
+            if (!q->items[i].media || q->items[i].media->type != core::MediaType::Radio)
+                items->emplace_back(static_cast<int>(i), q->items[i]);
+        size_t count = items->size();
         uint32_t total = 0;
-        for (size_t i = first; q && i < q->items.size(); ++i) total += q->items[i].duration_s;
+        for (const auto& e : *items) total += e.second.duration_s;
 
         lv_obj_t* head = kit::row(right_, 12);
         lv_obj_set_size(head, lv_pct(100), 64);
@@ -81,19 +86,18 @@ private:
         }
         // A service that isn't answering: its songs below are marked unavailable by Music Assistant.
         std::map<std::string, int> down;
-        for (size_t i = first; i < q->items.size(); ++i)
-            if (!q->items[i].available && q->items[i].media) ++down[q->items[i].media->badge_provider()];
+        for (const auto& e : *items)
+            if (!e.second.available && e.second.media) ++down[e.second.media->badge_provider()];
         if (!down.empty()) {
             auto worst = std::max_element(down.begin(), down.end(), [](auto& a, auto& b) { return a.second < b.second; });
             banner(right_, i18n::tr(i18n::Str::queue_provider_down, kit::provider_name(worst->first)),
                    i18n::tr(i18n::Str::queue_provider_down_body, std::to_string(worst->second)));
         }
-        auto items = std::make_shared<std::vector<core::QueueItem>>(q->items.begin() + static_cast<long>(first), q->items.end());
-        kit::virtual_list(right_, items->size(), 76, 4, [items, first](lv_obj_t* list, size_t n) {
-            const core::QueueItem& qi = (*items)[n];
+        kit::virtual_list(right_, items->size(), 76, 4, [items](lv_obj_t* list, size_t n) {
+            const core::QueueItem& qi = (*items)[n].second;
             core::MediaItem m = qi.media ? *qi.media : core::MediaItem{};
             if (!qi.media) m.name = qi.name;
-            int index = static_cast<int>(first + n);
+            int index = (*items)[n].first;
             std::string id = qi.queue_item_id;
             kit::RowOptions o;
             o.height = 76;

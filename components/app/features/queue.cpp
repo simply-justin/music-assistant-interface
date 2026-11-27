@@ -67,6 +67,7 @@ private:
     }
 
     void add(const cmd::AddToQueue& a) {
+        if (a.item.type == core::MediaType::Radio) return;  // a live stream never ends, so nothing after it would play
         if (!guard_.allow("add|" + a.item.uri, ctx_.now_ms)) return;
         if (!a.force && contains(a.item)) {
             cmd::AddToQueue again = a;

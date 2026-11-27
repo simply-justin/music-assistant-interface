@@ -396,6 +396,20 @@ TEST(tap_survives_a_status_update) {
     CHECK(g_panel->queue && !g_panel->queue->items.empty() && g_panel->queue->items[0].name == "NPO Radio 2");
 }
 
+// A station never ends, so the hold menu offers no Play next / Add to queue for it.
+TEST(radio_hold_menu_has_no_queue_actions) {
+    ui::open(ui::ScreenId::Home);
+    g_panel->run(300);
+    lv_obj_t* tile = find_text("NPO Radio 2");
+    CHECK(tile);
+    if (!tile) return;
+    press_at(center(tile), 900);
+    g_panel->run(300);
+    CHECK(find_text("Remove from favourites"));  // the menu is open
+    CHECK(!find_text("Add to queue") && !find_text("Play next"));
+    close_overlays();
+}
+
 TEST(language_switch_applies_instantly) {
     CHECK(tap("Settings"));
     CHECK(tap("Language"));
